@@ -34,7 +34,7 @@ export interface GraphAnalysis {
 }
 
 /** Segments at most this wide in x (0.2 on the 0–100 scale) are a vertical jump, not a curve. */
-const JUMP_WIDTH = 0.002 + 1e-9
+export const JUMP_WIDTH = 0.002 + 1e-9
 
 type EndCondition = { clamp: number } | 'natural' | 'parabolic'
 

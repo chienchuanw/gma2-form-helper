@@ -156,6 +156,17 @@ describe('fitStroke', () => {
     expect(fitStroke(s, { tolerance: 0.02 }).every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true)
   })
 
+  it('keeps at most a jump pair on any x, even for slanted edges with snapping', () => {
+    // A square edge drawn slightly slanted: climbs over 1.5 units of x.
+    const f = (x: number) => (x < 0.37 ? 0.1 : x < 0.385 ? 0.1 + ((x - 0.37) / 0.015) * 0.8 : 0.9)
+    for (const grid of [null, { x: 0.125, y: 0.1 }]) {
+      const pts = fitStroke(stroke(f, 0, 1, 600, 0.002), { tolerance: 0.02, grid })
+      const perX = new Map<number, number>()
+      for (const p of pts) perX.set(p.x, (perX.get(p.x) ?? 0) + 1)
+      expect(Math.max(...perX.values())).toBeLessThanOrEqual(2)
+    }
+  })
+
   it('returns nothing for a stroke too short to fit', () => {
     expect(fitStroke([{ x: 0.5, y: 0.5 }], { tolerance: 0.02 })).toEqual([])
   })

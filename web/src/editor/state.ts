@@ -1,3 +1,4 @@
+import { drawable } from '../core/fit'
 import { roundCoord, roundTyped, sortPoints, type Form, type Graph, type Mode, type Point } from '../core/model'
 
 export interface EditorState {
@@ -101,6 +102,14 @@ function apply(h: History, action: Action): History {
       if (!h.dragStart) return { ...h, present: next }
       return { past: [...h.past, h.dragStart], present: next, future: [], dragging: true }
     }
+    case 'drawStroke':
+      // A re-fit of the latest stroke starts from the graph as it was before
+      // the stroke, so it matches a fresh fit at the new precision.
+      if (isLatestStroke(h, action.stroke) && h.past.length > 0) {
+        const base = h.past[h.past.length - 1]
+        return record(h, edit({ ...base, active: s.active }, action), coalesceKind(action))
+      }
+      return record(h, edit(s, action), coalesceKind(action))
     case 'endDrag':
       return { past: h.past, present: s, future: h.future }
     case 'select':
@@ -178,7 +187,7 @@ function edit(s: EditorState, action: Action): EditorState {
       const from = Math.min(action.from, ...action.points.map((p) => p.x))
       const to = Math.max(action.to, ...action.points.map((p) => p.x))
       const kept = graph.points.filter((p) => p.x < from - 1e-9 || p.x > to + 1e-9)
-      const points = sortPoints([...kept, ...action.points])
+      const points = drawable(sortPoints([...kept, ...action.points]))
       return { ...withGraph(s, s.active, { ...graph, points }), selected: null }
     }
     case 'deletePoint':
