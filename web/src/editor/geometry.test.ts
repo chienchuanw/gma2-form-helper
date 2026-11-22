@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Graph } from '../core/model'
-import { PLOT, curvePoints, fromSvg, nearestPoint, snap, toSvg } from './geometry'
+import { snap } from '../core/model'
+import { PLOT, curvePoints, fromSvg, nearestPoint, toSvg } from './geometry'
 
 describe('plot mapping', () => {
   it('maps 0–1 graph space to SVG and back', () => {

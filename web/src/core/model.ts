@@ -39,12 +39,21 @@ export function sortPoints(points: readonly Point[]): Point[] {
   return [...points].sort((a, b) => a.x - b.x)
 }
 
+export function clamp01(v: number): number {
+  return Math.min(1, Math.max(0, v))
+}
+
 /** Round a 0–1 value to one decimal on the 0–100 scale (0.001), clamped to 0–1. Applied to points the tool creates or moves. */
 export function roundCoord(v: number): number {
-  return Math.min(1, Math.max(0, Math.round(v * 1000) / 1000))
+  return clamp01(Math.round(v * 1000) / 1000)
 }
 
 /** Round a typed 0–1 value to MA's two decimals on the 0–100 scale (0.0001), clamped to 0–1. */
 export function roundTyped(v: number): number {
-  return Math.min(1, Math.max(0, Math.round(v * 10000) / 10000))
+  return clamp01(Math.round(v * 10000) / 10000)
+}
+
+/** Snap a 0–1 value to a grid step (0 = off). */
+export function snap(v: number, step: number): number {
+  return step > 0 ? Math.round(v / step) * step : v
 }

@@ -1,5 +1,5 @@
 import { evaluate } from './evaluate'
-import { roundCoord, type Mode, type Point } from './model'
+import { clamp01, roundCoord, snap, type Mode, type Point } from './model'
 
 export interface FitOptions {
   /** Largest allowed distance between the stroke and the fitted curve (0–1 scale). */
@@ -8,7 +8,8 @@ export interface FitOptions {
   grid?: { x: number; y: number } | null
 }
 
-interface Sample {
+/** A pointer sample in 0–1 graph coordinates. */
+export interface Sample {
   x: number
   y: number
 }
@@ -52,6 +53,12 @@ export function fitStroke(samples: readonly Sample[], opts: FitOptions): Point[]
     points = build(pieces, keys, tol)
   }
   return opts.grid ? snapPoints(points, opts.grid) : points
+}
+
+/** The x range a stroke covers once backtracking is dropped, or null if it is too short to fit. */
+export function strokeSpan(samples: readonly Sample[]): { from: number; to: number } | null {
+  const m = monotonic(samples)
+  return m.length ? { from: m[0].x, to: m[m.length - 1].x } : null
 }
 
 /** Drop backtracking so x never decreases; clamp into the unit square. */
@@ -109,10 +116,7 @@ function resample(s: Sample[]): Sample[] {
   for (let k = 0; k <= n; k++) {
     const x = x0 + ((x1 - x0) * k) / n
     while (j + 1 < s.length - 1 && s[j + 1].x < x) j++
-    const a = s[j]
-    const b = s[Math.min(j + 1, s.length - 1)]
-    const f = b.x > a.x ? (x - a.x) / (b.x - a.x) : 1
-    out.push({ x, y: a.y + (b.y - a.y) * Math.min(1, Math.max(0, f)) })
+    out.push({ x, y: lerpY(s[j], s[Math.min(j + 1, s.length - 1)], x) })
   }
   return out
 }
@@ -145,7 +149,8 @@ function farthest(s: Sample[], i: number, j: number): [number, number] {
   return [best, dist]
 }
 
-const lerpY = (a: Sample, b: Sample, x: number) => (b.x > a.x ? a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x) : b.y)
+/** y on the line through a and b at x, clamped to the segment. */
+const lerpY = (a: Sample, b: Sample, x: number) => (b.x > a.x ? a.y + (b.y - a.y) * clamp01((x - a.x) / (b.x - a.x)) : b.y)
 
 /** Direction change at sample k of a piece, from the stroke on both sides. */
 function turn(s: Sample[], k: number): number {
@@ -198,10 +203,8 @@ function build(pieces: Sample[][], keys: number[][], tol: number): Point[] {
   const last = segs[segs.length - 1]
   const fullCycle = first.x <= 0.01 && last.x >= 0.99
   const closes = fullCycle && segs.length > 2 && Math.abs(last.y - first.y) <= tol
-  // The last point stays when the wrap jumps from it back to the start value.
-  function fullCycleKeep(p: Seg) {
-    return p !== last || !fullCycle || closes
-  }
+  // Otherwise the wrap jumps from the last point back to the start value.
+  const wrapJump = fullCycle && !closes
   if (closes) {
     segs.pop()
     segs[segs.length - 1].jump = false
@@ -215,7 +218,7 @@ function build(pieces: Sample[][], keys: number[][], tol: number): Point[] {
   for (let i = segs.length - 2; i >= 0; i--) {
     const a = segs[i]
     const b = segs[i + 1]
-    const intoJump = b.jump || (i + 1 === segs.length - 1 && !fullCycleKeep(b))
+    const intoJump = b.jump || (wrapJump && b === last)
     if (intoJump && !a.curved && !a.jump && Math.abs(a.y - b.y) <= tol / 2) {
       a.step = true
       segs.splice(i + 1, 1)
@@ -223,8 +226,9 @@ function build(pieces: Sample[][], keys: number[][], tol: number): Point[] {
   }
 
   const n = segs.length
-  const curvedAt = (i: number) => segs[((i % n) + n) % n].curved && !segs[((i % n) + n) % n].jump
-  const cornerAt = (i: number) => segs[((i % n) + n) % n].corner
+  const at = (i: number) => segs[(i + n) % n] // i runs from -1 to n
+  const curvedAt = (i: number) => at(i).curved && !at(i).jump
+  const cornerAt = (i: number) => at(i).corner
   return segs.map((seg, i): Point => ({ x: seg.x, y: seg.y, mode: modeOf(i) }))
 
   function modeOf(i: number): Mode {
@@ -266,7 +270,7 @@ function snapPoints(points: Point[], grid: { x: number; y: number }): Point[] {
   const out: Point[] = []
   let prevX: number | null = null
   for (const p of points) {
-    const q = { ...p, x: roundCoord(Math.round(p.x / grid.x) * grid.x), y: roundCoord(Math.round(p.y / grid.y) * grid.y) }
+    const q = { ...p, x: roundCoord(snap(p.x, grid.x)), y: roundCoord(snap(p.y, grid.y)) }
     const prev = out[out.length - 1]
     const drawnJump = prevX !== null && p.x === prevX
     if (prev && prev.x === q.x && (!drawnJump || prev.y === q.y)) continue
@@ -274,8 +278,4 @@ function snapPoints(points: Point[], grid: { x: number; y: number }): Point[] {
     prevX = p.x
   }
   return out
-}
-
-function clamp01(v: number): number {
-  return Math.min(1, Math.max(0, v))
 }
