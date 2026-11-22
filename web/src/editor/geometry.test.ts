@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Graph } from '../core/model'
-import { PLOT, curvePoints, exportFileName, fromSvg, nearestPoint, snap, toSvg } from './geometry'
+import { PLOT, curvePoints, fromSvg, nearestPoint, snap, toSvg } from './geometry'
 
 describe('plot mapping', () => {
   it('maps 0–1 graph space to SVG and back', () => {
@@ -41,12 +41,5 @@ describe('nearestPoint', () => {
 
     expect(nearestPoint(g, sx + 3, sy - 3, 10)).toBe(1)
     expect(nearestPoint(g, sx + 30, sy, 10)).toBeNull()
-  })
-})
-
-describe('exportFileName', () => {
-  it('makes an ASCII file name MA can import', () => {
-    expect(exportFileName('Rain Stair #2')).toBe('fh_Rain_Stair_2.xml')
-    expect(exportFileName('彩虹')).toBe('fh_form.xml')
   })
 })

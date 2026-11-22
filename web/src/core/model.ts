@@ -43,3 +43,8 @@ export function sortPoints(points: readonly Point[]): Point[] {
 export function roundCoord(v: number): number {
   return Math.min(1, Math.max(0, Math.round(v * 1000) / 1000))
 }
+
+/** Round a typed 0–1 value to MA's two decimals on the 0–100 scale (0.0001), clamped to 0–1. */
+export function roundTyped(v: number): number {
+  return Math.min(1, Math.max(0, Math.round(v * 10000) / 10000))
+}

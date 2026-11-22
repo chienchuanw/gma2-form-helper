@@ -1,7 +1,8 @@
 import { type KeyboardEvent, type FocusEvent } from 'react'
-import { MODES, type Graph, type Mode } from '../core/model'
-import { MODE_LABELS, formatCoord } from '../core/table'
+import type { Graph } from '../core/model'
+import { formatCoord } from '../core/table'
 import { useStrings } from '../i18n'
+import { ModeSelect } from './ModeSelect'
 import type { Action } from './state'
 
 interface Props {
@@ -18,7 +19,6 @@ export function PointTable({ graph, selected, dispatch }: Props) {
     if ('key' in e && e.key !== 'Enter') return
     const v = Number(e.currentTarget.value)
     if (e.currentTarget.value.trim() === '' || !Number.isFinite(v)) return
-    if (Math.abs(v / 100 - graph.points[index][axis]) < 1e-9) return
     dispatch({ type: 'setPoint', index, [axis]: v / 100 })
   }
 
@@ -37,11 +37,12 @@ export function PointTable({ graph, selected, dispatch }: Props) {
       </thead>
       <tbody>
         {graph.points.map((p, i) => (
-          <tr key={`${i}:${p.x}:${p.y}`} className={i === selected ? 'selected' : undefined} onClick={() => dispatch({ type: 'select', index: i })}>
+          <tr key={i} className={i === selected ? 'selected' : undefined} onClick={() => dispatch({ type: 'select', index: i })}>
             <td className="num">{i + 1}</td>
             {(['x', 'y'] as const).map((axis) => (
               <td key={axis}>
                 <input
+                  key={p[axis]}
                   type="number"
                   min={0}
                   max={100}
@@ -54,17 +55,7 @@ export function PointTable({ graph, selected, dispatch }: Props) {
               </td>
             ))}
             <td>
-              <select
-                aria-label={`${t.mode} ${i + 1}`}
-                value={p.mode}
-                onChange={(e) => dispatch({ type: 'setPoint', index: i, mode: e.target.value as Mode })}
-              >
-                {MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {MODE_LABELS[m]}
-                  </option>
-                ))}
-              </select>
+              <ModeSelect label={`${t.mode} ${i + 1}`} value={p.mode} onChange={(mode) => dispatch({ type: 'setPoint', index: i, mode })} />
             </td>
             <td>
               <button type="button" className="icon" aria-label={t.deletePoint} title={t.deletePoint} onClick={() => dispatch({ type: 'deletePoint', index: i })}>
