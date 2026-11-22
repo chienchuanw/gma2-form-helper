@@ -4,3 +4,5 @@ __pycache__/
 .playwright-mcp/
 dist/
 .vercel/
+.vercel
+.env*
