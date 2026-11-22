@@ -12,18 +12,24 @@ export interface History {
   past: EditorState[]
   present: EditorState
   future: EditorState[]
+  /** State before the current drag; pushed to past on the first real move. */
+  dragStart?: EditorState
+  /** Kind of the last recorded edit, so a run of the same continuous edit is one undo step. */
+  lastKind?: string
 }
 
 export type Action =
   | { type: 'load'; form: Form }
   | { type: 'addPoint'; x: number; y: number }
-  /** transient: part of a drag already recorded by beginDrag. */
-  | { type: 'movePoint'; index: number; x: number; y: number; transient?: boolean }
+  | { type: 'movePoint'; index: number; x: number; y: number }
   | { type: 'setPoint'; index: number; x?: number; y?: number; mode?: Mode }
   | { type: 'deletePoint'; index: number }
   | { type: 'select'; index: number | null }
-  /** Select a point and snapshot the history before dragging it. */
+  /** Grab a point: selects it; the drag becomes one undo step once it moves. */
   | { type: 'beginDrag'; index: number }
+  /** Move the grabbed (selected) point. */
+  | { type: 'dragTo'; x: number; y: number }
+  | { type: 'endDrag' }
   | { type: 'nudgePoint'; dx: number; dy: number }
   | { type: 'setActive'; index: number }
   | { type: 'addGraph' }
@@ -61,48 +67,77 @@ export function reducer(h: History, action: Action): History {
   const s = h.present
   switch (action.type) {
     case 'load':
-      return { past: [], present: { form: action.form, active: 0, selected: null }, future: [] }
+      return record(h, { form: action.form, active: 0, selected: null })
     case 'undo':
       if (h.past.length === 0) return h
       return { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [s, ...h.future] }
     case 'redo':
       if (h.future.length === 0) return h
       return { past: [...h.past, s], present: h.future[0], future: h.future.slice(1) }
-    case 'beginDrag':
-      return { past: [...h.past, s], present: { ...s, selected: action.index }, future: [] }
+    case 'beginDrag': {
+      const present = { ...s, selected: action.index }
+      return { ...h, present, dragStart: present }
+    }
+    case 'dragTo': {
+      if (s.selected === null) return h
+      const next = edit(s, { type: 'movePoint', index: s.selected, x: action.x, y: action.y })
+      if (next === s) return h
+      if (!h.dragStart) return { ...h, present: next }
+      return { past: [...h.past, h.dragStart], present: next, future: [] }
+    }
+    case 'endDrag':
+      return h.dragStart ? { past: h.past, present: s, future: h.future } : h
     case 'select':
       return { ...h, present: { ...s, selected: action.index } }
     case 'setActive':
       return { ...h, present: { ...s, active: action.index, selected: null } }
-    case 'movePoint':
-      return action.transient ? { ...h, present: edit(s, action) } : record(h, edit(s, action))
     default:
-      return record(h, edit(s, action))
+      return record(h, edit(s, action), coalesceKind(action))
   }
 }
 
-function record(h: History, next: EditorState): History {
-  if (next === h.present) return h
-  return { past: [...h.past, h.present], present: next, future: [] }
+/** Edits that arrive in a continuous stream (typing a name, dragging a colour picker). */
+function coalesceKind(action: Action): string | undefined {
+  if (action.type === 'setFormName') return 'formName'
+  if (action.type === 'setGraphColor') return `color:${action.index}`
+  return undefined
+}
+
+/**
+ * Push the present onto the undo stack, unless only the selection or active tab
+ * changed, or this continues a run of the same continuous edit.
+ */
+function record(h: History, next: EditorState, kind?: string): History {
+  if (next === h.present) return { ...h, dragStart: undefined }
+  if (next.form === h.present.form) return { ...h, present: next, dragStart: undefined }
+  if (kind !== undefined && kind === h.lastKind) return { ...h, present: next, future: [], lastKind: kind }
+  return { past: [...h.past, h.present], present: next, future: [], lastKind: kind }
 }
 
 function edit(s: EditorState, action: Action): EditorState {
   const graph = s.form.graphs[s.active]
   switch (action.type) {
     case 'addPoint': {
-      const p: Point = { x: roundCoord(action.x), y: roundCoord(action.y), mode: modeAt(graph, action.x) }
+      const x = roundCoord(action.x)
+      const y = roundCoord(action.y)
+      // A click that lands exactly on a point (e.g. snapped onto it) selects it.
+      const existing = graph.points.findIndex((q) => q.x === x && q.y === y)
+      if (existing !== -1) return { ...s, selected: existing }
+      const p: Point = { x, y, mode: modeAt(graph, action.x) }
       return withPoints(s, [...graph.points, p], p)
     }
     case 'movePoint': {
       const old = graph.points[action.index]
       if (!old) return s
       const p: Point = { ...old, x: roundCoord(action.x), y: roundCoord(action.y) }
+      if (p.x === old.x && p.y === old.y) return s
       return withPoints(s, graph.points.map((q, i) => (i === action.index ? p : q)), p)
     }
     case 'nudgePoint': {
       const old = s.selected === null ? undefined : graph.points[s.selected]
       if (!old) return s
       const p: Point = { ...old, x: roundCoord(old.x + action.dx), y: roundCoord(old.y + action.dy) }
+      if (p.x === old.x && p.y === old.y) return s
       return withPoints(s, graph.points.map((q) => (q === old ? p : q)), p)
     }
     case 'setPoint': {
@@ -134,11 +169,16 @@ function edit(s: EditorState, action: Action): EditorState {
     case 'renameGraph': {
       const g = s.form.graphs[action.index]
       const name = action.name.trim() || undefined
+      if (name === g.name) return s
       return withGraph(s, action.index, { ...g, name })
     }
-    case 'setGraphColor':
-      return withGraph(s, action.index, { ...s.form.graphs[action.index], color: action.color })
+    case 'setGraphColor': {
+      const g = s.form.graphs[action.index]
+      if (action.color === g.color) return s
+      return withGraph(s, action.index, { ...g, color: action.color })
+    }
     case 'setFormName':
+      if (action.name === s.form.name) return s
       return { ...s, form: { ...s.form, name: action.name } }
     default:
       return s

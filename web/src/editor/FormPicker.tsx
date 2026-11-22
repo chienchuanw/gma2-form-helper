@@ -27,7 +27,7 @@ export function FormPicker({ forms, onPick, onCancel }: Props) {
         {forms.map((f, i) => (
           <li key={i}>
             <button type="button" onClick={() => onPick(f)}>
-              {f.name || `Form ${i + 1}`} <span className="muted">· {f.graphs.length} graph{f.graphs.length === 1 ? '' : 's'}</span>
+              {f.name || `Form ${i + 1}`} <span className="muted">· {t.graphCount(f.graphs.length)}</span>
             </button>
           </li>
         ))}

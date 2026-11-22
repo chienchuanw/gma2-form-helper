@@ -271,11 +271,18 @@ label.inline select {
   margin: 6px 0 12px;
 }
 
-.graph-tabs [role='tablist'] {
+.tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-row [role='tablist'] {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  border-bottom: 1px solid var(--border);
 }
 
 .tab {

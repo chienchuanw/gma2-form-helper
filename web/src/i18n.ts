@@ -38,6 +38,9 @@ const en = {
   pickForm: 'This file has several forms. Pick one to edit:',
   cancel: 'Cancel',
   importError: 'Could not read this file:',
+  noForms: 'it holds no Form with a graph.',
+  copyFailed: 'Copy failed',
+  graphCount: (n: number) => `${n} graph${n === 1 ? '' : 's'}`,
   tableHelp: 'Enter these values in MA: Edit the form, Table Mode, one tab per graph.',
 }
 
@@ -78,6 +81,9 @@ const zh: Strings = {
   pickForm: '這個檔案有多個 Form，請選一個來編輯：',
   cancel: '取消',
   importError: '無法讀取這個檔案：',
+  noForms: '檔案中沒有含 graph 的 Form。',
+  copyFailed: '複製失敗',
+  graphCount: (n: number) => `${n} 個 graph`,
   tableHelp: '在 MA 中：Edit 這個 Form，切到 Table Mode，每個 graph 一個分頁，照下表輸入。',
 }
 
