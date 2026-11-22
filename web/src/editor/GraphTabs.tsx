@@ -15,20 +15,22 @@ export function GraphTabs({ form, active, dispatch }: Props) {
 
   return (
     <div className="graph-tabs">
-      <div role="tablist" aria-label={t.graphs}>
-        {form.graphs.map((g, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === active}
-            className="tab"
-            onClick={() => dispatch({ type: 'setActive', index: i })}
-          >
-            <span className="swatch" style={{ background: `#${g.color}` }} aria-hidden="true" />
-            {i + 1}. {g.name ?? t.unnamed}
-          </button>
-        ))}
+      <div className="tab-row">
+        <div role="tablist" aria-label={t.graphs}>
+          {form.graphs.map((g, i) => (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={i === active}
+              className="tab"
+              onClick={() => dispatch({ type: 'setActive', index: i })}
+            >
+              <span className="swatch" style={{ background: `#${g.color}` }} aria-hidden="true" />
+              {i + 1}. {g.name ?? t.unnamed}
+            </button>
+          ))}
+        </div>
         <button type="button" className="tab add" onClick={() => dispatch({ type: 'addGraph' })}>
           + {t.addGraph}
         </button>

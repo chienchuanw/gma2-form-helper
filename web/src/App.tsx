@@ -22,7 +22,7 @@ export default function App() {
   const [version, setVersion] = useState(DEFAULT_VERSION)
   const [choices, setChoices] = useState<Form[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
   const t = STRINGS[lang]
 
   const { form, active, selected } = history.present
@@ -41,6 +41,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, select, textarea')) return
+      if (document.querySelector('dialog[open]')) return
       const mod = e.metaKey || e.ctrlKey
       const sel = selectedRef.current
       if (mod && e.key.toLowerCase() === 'z') {
@@ -69,8 +70,9 @@ export default function App() {
     e.target.value = ''
     if (!file) return
     try {
-      const forms = parseFormsXml(await file.text())
-      if (forms.length === 0) throw new Error('no <Form> in file')
+      // A Form needs at least one graph to be edited (and MA always writes one).
+      const forms = parseFormsXml(await file.text()).filter((f) => f.graphs.length > 0)
+      if (forms.length === 0) throw new Error(t.noForms)
       setError(null)
       if (forms.length === 1) dispatch({ type: 'load', form: forms[0] })
       else setChoices(forms)
@@ -86,13 +88,18 @@ export default function App() {
     a.href = url
     a.download = exportFileName(form.name)
     a.click()
-    URL.revokeObjectURL(url)
+    // Revoking right away can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   const onCopy = async () => {
-    await navigator.clipboard.writeText(tableText(form))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(tableText(form))
+      setCopied('ok')
+    } catch {
+      setCopied('failed')
+    }
+    setTimeout(() => setCopied('idle'), 1500)
   }
 
   return (
@@ -181,7 +188,7 @@ export default function App() {
           <div className="toolbar">
             <h2>{t.points}</h2>
             <button type="button" onClick={onCopy}>
-              {copied ? t.copied : t.copyTable}
+              {copied === 'ok' ? t.copied : copied === 'failed' ? t.copyFailed : t.copyTable}
             </button>
           </div>
           <p className="muted">{t.tableHelp}</p>

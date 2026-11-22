@@ -85,6 +85,27 @@ describe('App', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not read this file')
   })
 
+  it('rejects a form without graphs instead of crashing', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const xml = '<?xml version="1.0"?><MA xmlns="http://schemas.malighting.de/grandma2/xml/MA"><Form index="0" name="Empty" display_2d="false" /></MA>'
+
+    await user.upload(screen.getByLabelText('Import XML'), new File([xml], 'x.xml'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not read this file')
+    expect(rows()).toHaveLength(2)
+  })
+
+  it('deletes a row without selecting the next point', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(within(rows()[0]).getByRole('button', { name: 'Delete point' }))
+    await user.keyboard('{Backspace}')
+
+    expect(rows()).toHaveLength(1)
+  })
+
   it('marks an all-spline form as approximate', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -144,10 +165,10 @@ describe('App', () => {
     vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 1064, height: 548 } as DOMRect)
 
     // Point 2 sits at x=50%, y=100% -> SVG (548, 16). Drag it to x=25%, y=50%.
-    fireEvent.pointerDown(svg, { clientX: 548, clientY: 16, pointerId: 1 })
-    fireEvent.pointerMove(svg, { clientX: 48 + 400, clientY: 16 + 200, pointerId: 1 })
-    fireEvent.pointerMove(svg, { clientX: 48 + 250, clientY: 16 + 250, pointerId: 1 })
-    fireEvent.pointerUp(svg, { pointerId: 1 })
+    fireEvent.pointerDown(svg, { clientX: 548, clientY: 16, pointerId: 1, isPrimary: true })
+    fireEvent.pointerMove(svg, { clientX: 48 + 400, clientY: 16 + 200, pointerId: 1, isPrimary: true })
+    fireEvent.pointerMove(svg, { clientX: 48 + 250, clientY: 16 + 250, pointerId: 1, isPrimary: true })
+    fireEvent.pointerUp(svg, { pointerId: 1, isPrimary: true })
 
     expect(within(rows()[1]).getByLabelText('X 2')).toHaveValue(25)
     expect(within(rows()[1]).getByLabelText('Y 2')).toHaveValue(50)
@@ -161,8 +182,8 @@ describe('App', () => {
     vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 1064, height: 548 } as DOMRect)
 
     // viewBox is 1064 x 548 with the plot at (48,16) 1000 x 500: x=75%, y=40%.
-    fireEvent.pointerDown(svg, { clientX: 48 + 750, clientY: 16 + 300, pointerId: 1 })
-    fireEvent.pointerUp(svg, { pointerId: 1 })
+    fireEvent.pointerDown(svg, { clientX: 48 + 750, clientY: 16 + 300, pointerId: 1, isPrimary: true })
+    fireEvent.pointerUp(svg, { pointerId: 1, isPrimary: true })
 
     expect(rows()).toHaveLength(3)
     expect(within(rows()[2]).getByLabelText('X 3')).toHaveValue(75)

@@ -1,5 +1,5 @@
 import { type KeyboardEvent, type FocusEvent } from 'react'
-import type { Graph } from '../core/model'
+import { roundTyped, type Graph } from '../core/model'
 import { formatCoord } from '../core/table'
 import { useStrings } from '../i18n'
 import { ModeSelect } from './ModeSelect'
@@ -15,10 +15,19 @@ interface Props {
 export function PointTable({ graph, selected, dispatch }: Props) {
   const t = useStrings()
 
+  const shown = (v: number) => String(Number(formatCoord(v)))
+
+  // Commit on Enter or blur; the field then shows what was stored (clamped and
+  // rounded), or the old value back if the input was not a number.
   const commit = (index: number, axis: 'x' | 'y') => (e: FocusEvent<HTMLInputElement> | KeyboardEvent<HTMLInputElement>) => {
     if ('key' in e && e.key !== 'Enter') return
-    const v = Number(e.currentTarget.value)
-    if (e.currentTarget.value.trim() === '' || !Number.isFinite(v)) return
+    const input = e.currentTarget
+    const v = Number(input.value)
+    if (input.value.trim() === '' || !Number.isFinite(v)) {
+      input.value = shown(graph.points[index][axis])
+      return
+    }
+    input.value = shown(roundTyped(v / 100))
     dispatch({ type: 'setPoint', index, [axis]: v / 100 })
   }
 
@@ -58,7 +67,10 @@ export function PointTable({ graph, selected, dispatch }: Props) {
               <ModeSelect label={`${t.mode} ${i + 1}`} value={p.mode} onChange={(mode) => dispatch({ type: 'setPoint', index: i, mode })} />
             </td>
             <td>
-              <button type="button" className="icon" aria-label={t.deletePoint} title={t.deletePoint} onClick={() => dispatch({ type: 'deletePoint', index: i })}>
+              <button type="button" className="icon" aria-label={t.deletePoint} title={t.deletePoint} onClick={(e) => {
+                  e.stopPropagation()
+                  dispatch({ type: 'deletePoint', index: i })
+                }}>
                 ×
               </button>
             </td>

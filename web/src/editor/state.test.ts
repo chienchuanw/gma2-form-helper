@@ -16,7 +16,7 @@ const form = (): Form => ({
   ],
 })
 
-const start = (): History => reducer(initialState(), { type: 'load', form: form() })
+const start = (): History => ({ ...reducer(initialState(), { type: 'load', form: form() }), past: [] })
 const pts = (h: History) => h.present.form.graphs[h.present.active].points
 
 describe('editor reducer', () => {
@@ -84,12 +84,62 @@ describe('editor reducer', () => {
   it('records a whole drag as one undo step', () => {
     let h = reducer(start(), { type: 'beginDrag', index: 1 })
     expect(h.present.selected).toBe(1)
-    h = reducer(h, { type: 'movePoint', index: 1, x: 0.4, y: 0.9, transient: true })
-    h = reducer(h, { type: 'movePoint', index: 1, x: 0.3, y: 0.8, transient: true })
+    h = reducer(h, { type: 'dragTo', x: 0.4, y: 0.9 })
+    h = reducer(h, { type: 'dragTo', x: 0.3, y: 0.8 })
+    h = reducer(h, { type: 'endDrag' })
     expect(pts(h)[1]).toMatchObject({ x: 0.3, y: 0.8 })
 
     h = reducer(h, { type: 'undo' })
     expect(pts(h)[1]).toMatchObject({ x: 0.5, y: 1 })
+  })
+
+  it('keeps dragging the same point when it passes a neighbour', () => {
+    let h = reducer(start(), { type: 'addPoint', x: 0.75, y: 0.5 })
+    h = reducer(h, { type: 'beginDrag', index: 1 }) // the point at x = 0.5
+    h = reducer(h, { type: 'dragTo', x: 0.9, y: 0.2 }) // passes x = 0.75
+    h = reducer(h, { type: 'dragTo', x: 0.95, y: 0.1 })
+
+    expect(pts(h).map((p) => [p.x, p.y])).toEqual([
+      [0, 0],
+      [0.75, 0.5],
+      [0.95, 0.1],
+    ])
+  })
+
+  it('does not record an undo step for grabbing a point without moving it', () => {
+    let h = reducer(start(), { type: 'beginDrag', index: 1 })
+    h = reducer(h, { type: 'endDrag' })
+
+    expect(h.past).toHaveLength(0)
+    expect(h.present.selected).toBe(1)
+  })
+
+  it('selects an existing point instead of stacking a duplicate on it', () => {
+    const h = reducer(start(), { type: 'addPoint', x: 0.5, y: 1 })
+
+    expect(pts(h)).toHaveLength(2)
+    expect(h.present.selected).toBe(1)
+    expect(h.past).toHaveLength(0)
+  })
+
+  it('records a run of colour or form-name edits as one undo step', () => {
+    let h = reducer(start(), { type: 'setFormName', name: 'Ta' })
+    h = reducer(h, { type: 'setFormName', name: 'Tab' })
+    h = reducer(h, { type: 'setGraphColor', index: 0, color: '111111' })
+    h = reducer(h, { type: 'setGraphColor', index: 0, color: '222222' })
+
+    expect(h.past).toHaveLength(2)
+    h = reducer(h, { type: 'undo' })
+    expect(h.present.form.graphs[0].color).toBe('c0c0c0')
+    expect(h.present.form.name).toBe('Tab')
+  })
+
+  it('does not record renames or recolours that change nothing', () => {
+    let h = reducer(start(), { type: 'renameGraph', index: 0, name: '' })
+    h = reducer(h, { type: 'setGraphColor', index: 0, color: 'c0c0c0' })
+    h = reducer(h, { type: 'setFormName', name: 'T' })
+
+    expect(h.past).toHaveLength(0)
   })
 
   it('does not record selection changes in the history', () => {
@@ -120,12 +170,13 @@ describe('editor reducer', () => {
     expect(h.present.form.graphs[0].name).toBeUndefined()
   })
 
-  it('loads a form as a fresh document', () => {
+  it('loads a form as an undoable step', () => {
     let h = reducer(start(), { type: 'addPoint', x: 0.8, y: 0.2 })
     h = reducer(h, { type: 'load', form: form() })
 
     expect(pts(h)).toHaveLength(2)
     expect(h.present.selected).toBeNull()
-    expect(h.past).toHaveLength(0)
+    h = reducer(h, { type: 'undo' })
+    expect(pts(h)).toHaveLength(3)
   })
 })

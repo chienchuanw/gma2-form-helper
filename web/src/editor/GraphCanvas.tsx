@@ -17,7 +17,8 @@ interface Props {
   dispatch: (a: Action) => void
 }
 
-const HIT_RADIUS = 14
+/** Grab radius in screen pixels, so points stay easy to hit on small screens. */
+const HIT_PX = 12
 const TICKS = Array.from({ length: 11 }, (_, i) => i / 10)
 
 export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
@@ -36,8 +37,10 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
   }
 
   const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
+    if (e.button > 0 || e.isPrimary === false) return // ignore right-clicks and extra fingers
     const [sx, sy] = toView(e)
-    const hit = nearestPoint(graph, sx, sy, HIT_RADIUS)
+    const width = svgRef.current!.getBoundingClientRect().width || VIEW_W
+    const hit = nearestPoint(graph, sx, sy, Math.max(8, (HIT_PX * VIEW_W) / width))
     if (hit === null) {
       const [x, y] = snapped(sx, sy)
       dispatch({ type: 'addPoint', x, y })
@@ -48,14 +51,17 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
 
+  // The reducer moves whichever point is selected, so fast moves never hit a stale index.
   const onPointerMove = (e: PointerEvent<SVGSVGElement>) => {
-    if (!dragging.current || selected === null) return
+    if (!dragging.current) return
     const [x, y] = snapped(...toView(e))
-    dispatch({ type: 'movePoint', index: selected, x, y, transient: true })
+    dispatch({ type: 'dragTo', x, y })
   }
 
   const endDrag = () => {
+    if (!dragging.current) return
     dragging.current = false
+    dispatch({ type: 'endDrag' })
   }
 
   // Major lines every 10 (with labels); the snap grid, where it differs, as faint minor lines.
