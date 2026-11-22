@@ -117,13 +117,19 @@ function M.list_cmd(dir, os_name)
     return string.format('ls -t "%s"/fh_*.xml 2>/dev/null', dir)
 end
 
--- Did the import land? before/after are { handle, name } of the target slot
--- (nil when empty); expected is the first Form's name in the file, if known.
+-- Did the import land? before/after are { name } of the target slot (nil when
+-- empty); expected is the first Form's name in the file, if known. A replaced
+-- Form keeps its handle (lab-verified on 3.9.60), so only a changed name proves
+-- the import, and re-importing a same-name Form can only be "unknown".
+-- Returns "yes", "no" or "unknown".
 function M.imported(before, after, expected)
-    if not after then return false end
-    if expected then return after.name == expected and (not before or after.handle ~= before.handle or before.name == expected) end
-    if not before then return true end
-    return after.handle ~= before.handle or after.name ~= before.name
+    if not after then return "no" end
+    if not before then return "yes" end
+    if expected then
+        if after.name ~= expected then return "no" end
+        return before.name == expected and "unknown" or "yes"
+    end
+    return after.name ~= before.name and "yes" or "unknown"
 end
 
 -- getobj.name answers "Flyout 123": the label with the pool number appended.
@@ -186,7 +192,7 @@ end
 local function slot_info(n)
     local h = form_handle(n)
     if not h then return nil end
-    return { handle = h, name = M.strip_number(call1(O.name, h), n) }
+    return { name = M.strip_number(call1(O.name, h), n) }
 end
 
 -- Ask for text; nil means the user cancelled.
@@ -236,6 +242,9 @@ function Start()
     if slot_in == nil then return note("cancelled") end
     local slot = M.parse_slot(slot_in)
     if not slot then return fail("Not a Form number: " .. tostring(slot_in)) end
+    if forms and slot + #forms - 1 > MAX_FORM then
+        return fail(string.format("%d Forms starting at Form %d would run past Form %d.", #forms, slot, MAX_FORM))
+    end
 
     -- 4. Never replace a Form without asking. With a readable file the plugin
     --    asks about every slot it fills; otherwise MA's own dialog asks.
@@ -263,11 +272,18 @@ function Start()
     gma.cmd(cmd)
     call1(gma.sleep, 0.5)
     local after = slot_info(slot)
-    if not M.imported(before, after, forms and forms[1].name or nil) then
+    local result = M.imported(before, after, forms and forms[1].name or nil)
+    if result == "no" then
         local now = after and string.format("Form %d still holds %q.", slot, after.name) or string.format("Form %d is empty.", slot)
         return fail(string.format("%s was not imported.\n\n%s\nThe import was cancelled, or %s is not in the\nimportexport folder of drive %d.", file, now, file, drive))
     end
-    note("Form %d is now %q", slot, after.name)
+    if result == "unknown" then
+        note("Form %d holds %q, as before: the import cannot be confirmed (same name)", slot, after.name)
+        call1(gma.gui.msgbox, PLUGIN_TITLE, string.format("Form %d holds %q, as it did before.\n\n" ..
+            "If the import went through it replaced a Form of the same name;\nif it was cancelled nothing changed. Check the Form to be sure.", slot, after.name))
+    else
+        note("Form %d is now %q", slot, after.name)
+    end
     gma.feedback(string.format("%s: Form %d = %s", PLUGIN_TITLE, slot, after.name))
     if not internal then note("drive %d is still selected", drive) end
 end
