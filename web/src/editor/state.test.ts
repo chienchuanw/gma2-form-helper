@@ -134,6 +134,25 @@ describe('editor reducer', () => {
     expect(h.present.form.name).toBe('Tab')
   })
 
+  it('starts a new undo step for a name edit after something else happened', () => {
+    let h = reducer(start(), { type: 'setFormName', name: 'A' })
+    h = reducer(h, { type: 'select', index: 0 })
+    h = reducer(h, { type: 'setFormName', name: 'AB' })
+
+    expect(h.past).toHaveLength(2)
+  })
+
+  it('ignores undo and redo while a point is being dragged', () => {
+    let h = reducer(start(), { type: 'addPoint', x: 0.8, y: 0.2 })
+    h = reducer(h, { type: 'beginDrag', index: 1 })
+    h = reducer(h, { type: 'dragTo', x: 0.3, y: 0.3 })
+    const during = reducer(h, { type: 'undo' })
+
+    expect(during).toBe(h)
+    h = reducer(reducer(h, { type: 'endDrag' }), { type: 'undo' })
+    expect(pts(h)[1]).toMatchObject({ x: 0.5, y: 1 })
+  })
+
   it('does not record renames or recolours that change nothing', () => {
     let h = reducer(start(), { type: 'renameGraph', index: 0, name: '' })
     h = reducer(h, { type: 'setGraphColor', index: 0, color: 'c0c0c0' })

@@ -16,6 +16,8 @@ export interface History {
   dragStart?: EditorState
   /** Kind of the last recorded edit, so a run of the same continuous edit is one undo step. */
   lastKind?: string
+  /** A point is being dragged: undo/redo wait until it is released. */
+  dragging?: boolean
 }
 
 export type Action =
@@ -64,7 +66,16 @@ export function initialState(): History {
 }
 
 export function reducer(h: History, action: Action): History {
+  const next = apply(h, action)
+  // Anything but another step of the same continuous edit ends that edit's run.
+  if (next.lastKind !== undefined && next === h) return next
+  if (next.lastKind !== undefined && coalesceKind(action) !== next.lastKind) return { ...next, lastKind: undefined }
+  return next
+}
+
+function apply(h: History, action: Action): History {
   const s = h.present
+  if (h.dragging && (action.type === 'undo' || action.type === 'redo')) return h
   switch (action.type) {
     case 'load':
       return record(h, { form: action.form, active: 0, selected: null })
@@ -76,17 +87,17 @@ export function reducer(h: History, action: Action): History {
       return { past: [...h.past, s], present: h.future[0], future: h.future.slice(1) }
     case 'beginDrag': {
       const present = { ...s, selected: action.index }
-      return { ...h, present, dragStart: present }
+      return { ...h, present, dragStart: present, dragging: true }
     }
     case 'dragTo': {
       if (s.selected === null) return h
       const next = edit(s, { type: 'movePoint', index: s.selected, x: action.x, y: action.y })
       if (next === s) return h
       if (!h.dragStart) return { ...h, present: next }
-      return { past: [...h.past, h.dragStart], present: next, future: [] }
+      return { past: [...h.past, h.dragStart], present: next, future: [], dragging: true }
     }
     case 'endDrag':
-      return h.dragStart ? { past: h.past, present: s, future: h.future } : h
+      return { past: h.past, present: s, future: h.future }
     case 'select':
       return { ...h, present: { ...s, selected: action.index } }
     case 'setActive':

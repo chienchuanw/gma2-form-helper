@@ -176,6 +176,22 @@ describe('App', () => {
     expect(within(rows()[1]).getByLabelText('X 2')).toHaveValue(50)
   })
 
+  it('commits a value still being typed before a canvas click shifts the rows', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const svg = screen.getByRole('application')
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 1064, height: 548 } as DOMRect)
+
+    const x = within(rows()[1]).getByLabelText('X 2')
+    await user.clear(x)
+    await user.type(x, '90')
+    fireEvent.pointerDown(svg, { clientX: 48 + 250, clientY: 16 + 250, pointerId: 1, isPrimary: true })
+
+    expect(rows()).toHaveLength(3)
+    expect(within(rows()[2]).getByLabelText('X 3')).toHaveValue(90)
+    expect(within(rows()[1]).getByLabelText('X 2')).toHaveValue(25)
+  })
+
   it('adds a point where the graph is clicked', () => {
     render(<App />)
     const svg = screen.getByRole('application')
