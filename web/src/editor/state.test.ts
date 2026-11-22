@@ -178,6 +178,28 @@ describe('editor reducer', () => {
     expect(pts(h).map((p) => p.x)).toEqual([0, 0.25, 0.625])
   })
 
+  it('never leaves a zero-width spline where kept and fitted points meet', () => {
+    let h = reducer(start(), { type: 'setPoint', index: 1, mode: 'spline' })
+    h = reducer(h, { type: 'addPoint', x: 0.124, y: 0.6 })
+    h = reducer(h, { type: 'setPoint', index: 1, mode: 'spline' }) // the kept off-grid point at x = 0.124
+    h = reducer(h, { type: 'drawStroke', stroke: 3, from: 0.125, to: 0.4, points: [{ x: 0.125, y: 0.2, mode: 'spline' }, { x: 0.4, y: 0.5, mode: 'spline' }] })
+    const p = pts(h)
+
+    p.forEach((q, i) => {
+      const next = p[(i + 1) % p.length]
+      const width = next.x + (i === p.length - 1 ? 1 : 0) - q.x
+      if (width <= 0.002) expect(q.mode).toBe('linear')
+    })
+  })
+
+  it('re-fits from the graph as it was before the stroke', () => {
+    const fit = (points: { x: number; y: number; mode: 'linear' }[]) => ({ type: 'drawStroke' as const, stroke: 9, from: 0.1, to: 0.9, points })
+    let h = reducer(start(), fit([{ x: 0.1, y: 0.1, mode: 'linear' }, { x: 0.95, y: 0.4, mode: 'linear' }]))
+    h = reducer(h, fit([{ x: 0.1, y: 0.2, mode: 'linear' }, { x: 0.9, y: 0.3, mode: 'linear' }]))
+
+    expect(pts(h).map((p) => p.x)).toEqual([0, 0.1, 0.9])
+  })
+
   it('re-fits the same stroke in place without a new undo step', () => {
     const fit = (y: number) => ({ type: 'drawStroke' as const, stroke: 7, from: 0.2, to: 0.6, points: [{ x: 0.3, y, mode: 'spline' as const }] })
     let h = reducer(start(), fit(0.1))

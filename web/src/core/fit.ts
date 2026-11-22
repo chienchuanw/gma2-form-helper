@@ -1,4 +1,4 @@
-import { evaluate } from './evaluate'
+import { JUMP_WIDTH, evaluate } from './evaluate'
 import { clamp01, roundCoord, snap, type Mode, type Point } from './model'
 
 export interface FitOptions {
@@ -206,12 +206,17 @@ function build(pieces: Sample[][], keys: number[][], tol: number, grid: { x: num
       const x = sx(jump ? pieces[pi + 1][0].x : s[k].x)
       const y = sy(s[k].y)
       const prev = segs[segs.length - 1]
-      // Two points on one x are only allowed as the two sides of a drawn jump;
-      // anything else (e.g. snapped onto the same grid line) would be an
+      // At most two points share an x, and only as the two sides of a drawn
+      // jump; anything else (e.g. snapped onto the same grid line) would be an
       // accidental jump, so the later point gives way.
-      if (prev && prev.x === x && (prev.y === y || !prev.jump)) {
-        if (jump) prev.jump = true
-        return
+      if (prev && prev.x === x) {
+        const prevIsSecond = segs.length >= 2 && segs[segs.length - 2].x === x
+        if (prev.jump && !prevIsSecond && prev.y !== y) {
+          // the right side of prev's jump: keep it
+        } else {
+          if (jump && !prevIsSecond) prev.jump = true
+          return
+        }
       }
       segs.push({
         x,
@@ -288,16 +293,17 @@ function worstSample(pieces: Sample[][], keys: number[][], points: Point[], tol:
 }
 
 /**
- * Last line of defence for MA: no spline segment of zero width (MA draws
- * nothing) and, in an all-spline graph, breaks that pair up (MA draws garbage).
+ * Last line of defence for MA, for fitted points and for a graph they were
+ * merged into: no spline segment of zero width (MA draws nothing) and, in an
+ * all-spline graph, breaks that pair up (MA draws garbage).
  */
-function drawable(points: Point[]): Point[] {
+export function drawable(points: readonly Point[]): Point[] {
   const n = points.length
-  if (n < 2) return points
+  if (n < 2) return [...points]
   const out = points.map((p, i) => {
     const next = points[(i + 1) % n]
     const width = next.x + (i === n - 1 ? 1 : 0) - p.x
-    return width <= 0.002 && p.mode.startsWith('spline') ? { ...p, mode: 'linear' as Mode } : p
+    return width <= JUMP_WIDTH && p.mode.startsWith('spline') ? { ...p, mode: 'linear' as Mode } : p
   })
   const breaks = out.filter((p) => p.mode === 'spline_break_start' || p.mode === 'spline_break_end').map((p) => p.mode)
   const paired = breaks.every((m, i) => m !== breaks[(i + 1) % breaks.length])
