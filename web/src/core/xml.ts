@@ -69,6 +69,7 @@ export interface SerializeOptions {
 /** Write Forms as a grandMA2 export file that `Import "file" At Form N` accepts. */
 export function serializeFormsXml(forms: Form[], opts: SerializeOptions = {}): string {
   const vs = opts.version ?? DEFAULT_VERSION
+  if (!/^\d+\.\d+\.\d+$/.test(vs)) throw new FormXmlError(`Invalid version "${vs}", expected e.g. "3.9.60"`)
   const [major, minor, stream] = vs.split('.')
   const date = (opts.date ?? new Date()).toISOString().slice(0, 19)
   const lines = [

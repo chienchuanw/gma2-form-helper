@@ -46,6 +46,7 @@ describe('evaluate', () => {
     expect(evaluate(jump, 0.49)).toBeCloseTo(0.98, 12)
     expect(evaluate(jump, 0.5)).toBeCloseTo(0.2, 12)
     expect(evaluate(jump, 0.7)).toBeCloseTo(0.2, 12)
+    expect(evaluate(jump, 0.5, 'left')).toBeCloseTo(1, 12)
   })
 
   it('holds the start value through a step_end segment', () => {
@@ -95,7 +96,33 @@ describe('evaluate', () => {
   })
 })
 
+describe('evaluate next to vertical jumps', () => {
+  it('does not overshoot a spline whose neighbour shares its x', () => {
+    const s = g(p(0, 0, 'spline'), p(0.5, 1, 'spline'), p(0.5, 0, 'spline'), p(0.75, 0.5, 'spline'))
+
+    for (let t = 0; t < 1; t += 0.005) {
+      const v = evaluate(s, t)
+      // Without jump handling this reached about 1.22 / -0.22.
+      expect(v).toBeGreaterThanOrEqual(-0.01)
+      expect(v).toBeLessThanOrEqual(1.01)
+    }
+  })
+})
+
 describe('sampleGraph', () => {
+  it('ends with the value reached at the end of the cycle, not the next cycle', () => {
+    const rampPlus = g(p(0, 0), p(1, 1))
+    const holdEnd = g(p(0, 0.2), p(0.5, 0.8, 'step_end'))
+
+    expect(sampleGraph(rampPlus, 4).at(-1)?.y).toBeCloseTo(1, 12)
+    expect(sampleGraph(holdEnd, 4).at(-1)?.y).toBe(0.8)
+    expect(sampleGraph(holdEnd, 4)[0].y).toBe(0.2)
+  })
+
+  it('needs at least one interval', () => {
+    expect(() => sampleGraph(g(p(0, 0)), 0)).toThrow(RangeError)
+  })
+
   it('samples n+1 evenly spaced points from 0 to 1', () => {
     const s = sampleGraph(g(p(0, 0), p(1, 1)), 4)
 
@@ -105,8 +132,10 @@ describe('sampleGraph', () => {
 })
 
 describe('isExactMode', () => {
-  it('flags linear and step modes as exact and spline modes as approximate', () => {
-    expect(['linear', 'step_start', 'step_end'].every((m) => isExactMode(m as Mode))).toBe(true)
-    expect(['spline', 'spline_break_start', 'spline_break_end'].some((m) => isExactMode(m as Mode))).toBe(false)
+  it('treats only linear as exact until the other modes are calibrated against MA', () => {
+    expect(isExactMode('linear')).toBe(true)
+    for (const m of ['spline', 'spline_break_start', 'spline_break_end', 'step_start', 'step_end'] as const) {
+      expect(isExactMode(m)).toBe(false)
+    }
   })
 })

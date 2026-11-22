@@ -120,6 +120,10 @@ describe('serializeFormsXml', () => {
     expect(out).toContain('<SubFormPoint index="1" x="0.25" mode="step_end" />')
   })
 
+  it('rejects a malformed version string', () => {
+    expect(() => serializeFormsXml([], { version: '3.9' })).toThrow(/version/)
+  })
+
   it('escapes special characters in names', () => {
     const out = serializeFormsXml([{ name: 'A & "B" <C>', display2d: false, graphs: [] }])
 
