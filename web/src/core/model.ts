@@ -12,17 +12,20 @@ export type Mode = (typeof MODES)[number]
 
 /** A graph point. x and y are 0–1, exactly as stored in MA's XML. */
 export interface Point {
-  x: number
-  y: number
-  mode: Mode
+  readonly x: number
+  readonly y: number
+  readonly mode: Mode
 }
 
-/** One graph of a Form (a <SubForm> in MA's XML). Points are sorted by x. */
+/**
+ * One graph of a Form (a <SubForm> in MA's XML). Points are sorted by x.
+ * Graphs are immutable: change one by building a new Graph (evaluate caches per object).
+ */
 export interface Graph {
-  name?: string
+  readonly name?: string
   /** Six-digit hex RGB without '#', e.g. "c0c0c0". */
-  color: string
-  points: Point[]
+  readonly color: string
+  readonly points: readonly Point[]
 }
 
 export interface Form {
@@ -32,7 +35,7 @@ export interface Form {
 }
 
 /** Points sorted by x. Points sharing an x keep their order (MA's creation order), which is how vertical jumps are drawn. */
-export function sortPoints(points: Point[]): Point[] {
+export function sortPoints(points: readonly Point[]): Point[] {
   return [...points].sort((a, b) => a.x - b.x)
 }
 

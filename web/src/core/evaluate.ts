@@ -9,12 +9,13 @@ import type { Graph, Mode, Point } from './model'
  * - linear: straight line. step_end: holds the start value, jumps at the end.
  *   step_start: jumps to the end value at the start.
  * - Consecutive spline segments form a chain solved as one C2 cubic spline in x.
- *   A chain ends at a non-spline neighbour, whose slope it takes (0 next to a
- *   step), or at a break: spline_break_start starts a new chain at its point and
- *   spline_break_end ends the chain at the end of its segment, with a natural
- *   (zero curvature) end condition. A graph made only of spline segments without
- *   breaks is one closed periodic spline. That last case matches MA only
- *   approximately; everything else matches within pixel accuracy.
+ *   spline_break_start starts a new chain at its point and spline_break_end ends
+ *   the chain at the end of its segment; a chain's own break end is parabolic
+ *   (m0 + m1 = 2 * secant), which leaves a corner. Every other chain end takes the
+ *   slope of the neighbouring segment: its secant for a linear segment or for the
+ *   first/last segment of a broken neighbour chain, 0 for a step.
+ *   A graph made only of spline segments without breaks is one closed periodic
+ *   spline; that case matches MA only approximately.
  */
 
 export type GraphWarning =
@@ -22,6 +23,8 @@ export type GraphWarning =
   | 'splineJump'
   /** Breaks in an all-spline graph do not alternate start/end; MA draws such a graph erratically. */
   | 'unpairedBreak'
+  /** The curve goes far past 0–100 (e.g. a spline next to a near-vertical segment); MA shoots off the chart too. */
+  | 'overshoot'
 
 export interface GraphAnalysis {
   /** True when the preview can differ from MA by more than pixel accuracy. */
@@ -32,7 +35,7 @@ export interface GraphAnalysis {
 /** Segments at most this wide in x (0.2 on the 0–100 scale) are a vertical jump, not a curve. */
 const JUMP_WIDTH = 0.002 + 1e-9
 
-type EndCondition = { clamp: number } | 'natural'
+type EndCondition = { clamp: number } | 'natural' | 'parabolic'
 
 /** One segment, from a point to the next (x0 may be followed by a wrap past x = 1). */
 interface Segment {
@@ -89,12 +92,12 @@ function compile(graph: Graph): Compiled {
       const startsChain = (k: number) =>
         isSpline(k) && (!isSpline(k - 1) || mode(k) === 'spline_break_start' || mode(k - 1) === 'spline_break_end')
 
-      // A chain that runs into a non-spline segment takes its slope (a step is flat).
+      // A chain end that is not its own break takes the neighbouring segment's slope:
+      // its secant (a linear segment or the edge of a broken chain), or 0 for a step.
       const neighbourCondition = (k: number): EndCondition => {
         if (isJump(k)) return 'natural'
-        if (mode(k) === 'linear') return { clamp: rise(k) / width(k) }
         if (mode(k) === 'step_start' || mode(k) === 'step_end') return { clamp: 0 }
-        return 'natural'
+        return { clamp: rise(k) / width(k) }
       }
 
       for (let k0 = 0; k0 < n; k0++) {
@@ -103,18 +106,31 @@ function compile(graph: Graph): Compiled {
         // startsChain(next) also covers a chain ending at a break_end segment.
         while (isSpline(segs.at(-1)! + 1) && !startsChain(segs.at(-1)! + 1) && segs.length < n) segs.push(segs.at(-1)! + 1)
         const last = segs.at(-1)!
-        const brokenStart = mode(k0) === 'spline_break_start' || mode(k0 - 1) === 'spline_break_end'
-        const start: EndCondition = brokenStart ? 'natural' : neighbourCondition(k0 - 1)
-        const end: EndCondition = mode(last) === 'spline_break_end' ? 'natural' : neighbourCondition(last + 1)
+        const start: EndCondition = mode(k0) === 'spline_break_start' ? 'parabolic' : neighbourCondition(k0 - 1)
+        const end: EndCondition = mode(last) === 'spline_break_end' ? 'parabolic' : neighbourCondition(last + 1)
         const m = solveSpline(segs.map(width), segs.map(rise), [start, end])
         segs.forEach((k, j) => (segments[wrap(k)].m = [m[j], m[j + 1]]))
       }
     }
   }
 
+  if (segments.some(overshoots)) warnings.push('overshoot')
+
   const compiled = { segments, analysis: { approximate, warnings } }
   cache.set(graph, compiled)
   return compiled
+}
+
+/** How far past 0–1 a spline must go to count as blowing up (ordinary spline overshoot near 0 or 1 is smaller). */
+const OVERSHOOT = 0.5
+
+function overshoots(seg: Segment): boolean {
+  if (!seg.m) return false
+  for (let i = 1; i < 32; i++) {
+    const v = hermite(seg.y0, seg.y1, seg.m[0] * seg.width, seg.m[1] * seg.width, i / 32)
+    if (v < -OVERSHOOT || v > 1 + OVERSHOOT) return true
+  }
+  return false
 }
 
 /** Breaks, read around the cycle, must alternate start, end, start, end… */
@@ -148,6 +164,10 @@ function solveSpline(h: number[], dy: number[], ends?: [EndCondition, EndConditi
         A[row][row] = 2
         A[row][other] = 1
         b[row] = 3 * slope
+      } else if (cond === 'parabolic') {
+        A[row][row] = 1
+        A[row][other] = 1
+        b[row] = 2 * slope
       } else {
         A[row][row] = 1
         b[row] = cond.clamp
@@ -185,7 +205,8 @@ function solveLinear(A: number[][], b: number[]): number[] {
 
 /** How faithfully the preview of this graph matches MA, and what MA will struggle with. */
 export function analyzeGraph(graph: Graph): GraphAnalysis {
-  return compile(graph).analysis
+  const { approximate, warnings } = compile(graph).analysis
+  return { approximate, warnings: [...warnings] }
 }
 
 /**

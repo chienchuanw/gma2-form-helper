@@ -22,8 +22,12 @@ const closedCases = ma.curves.filter((c) => c.name.startsWith('closed spline'))
 
 describe('evaluate matches MA', () => {
   it.each(exactCases.map((c) => [c.name, c] as const))('%s within pixel accuracy', (_, c) => {
-    // Pixel extraction is good to about ±1 on the 0–100 scale.
-    expect(Math.max(...errors(c))).toBeLessThan(1.5)
+    // Issue #2 asks for a match within 1 unit. Pixel extraction adds error that grows
+    // with slope (one pixel in x is ~0.1 unit, i.e. ~0.5 in y on the steepest curves),
+    // so allow a little headroom on the worst sample but hold the RMS well below 1.
+    const e = errors(c)
+    expect(Math.sqrt(e.reduce((s, v) => s + v * v, 0) / e.length)).toBeLessThan(0.5)
+    expect(Math.max(...e)).toBeLessThan(1.25)
     expect(analyzeGraph(graphOf(c)).approximate).toBe(false)
   })
 
@@ -54,6 +58,22 @@ describe('analyzeGraph', () => {
     const g = { color: 'c0c0c0', points: [p(0, 0.2), p(0.3, 0.9), p(0.3, 0.1), p(0.7, 0.6)] }
 
     expect(analyzeGraph(g).warnings).toContain('splineJump')
+  })
+
+  it('warns when a spline overshoots far past 0–100, as MA does next to a near-vertical segment', () => {
+    // A spline chain next to a 0.3-wide linear segment: MA draws the curve far off the chart too.
+    const g = { color: 'c0c0c0', points: [p(0, 0.2), p(0.3, 0.8), p(0.5, 0.3, 'linear'), p(0.503, 0.9), p(0.8, 0.5)] }
+    const gentle = { color: 'c0c0c0', points: [p(0, 0.5), p(0.3, 0.9), p(0.6, 0.1)] }
+
+    expect(analyzeGraph(g).warnings).toContain('overshoot')
+    expect(analyzeGraph(gentle).warnings).toEqual([])
+  })
+
+  it('returns a fresh result each time so callers cannot corrupt the cache', () => {
+    const g = { color: 'c0c0c0', points: [p(0, 0.5), p(0.3, 0.9), p(0.6, 0.1)] }
+    analyzeGraph(g).warnings.push('splineJump')
+
+    expect(analyzeGraph(g).warnings).toEqual([])
   })
 
   it('warns about breaks that do not pair up in an all-spline graph', () => {
