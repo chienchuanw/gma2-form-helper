@@ -234,6 +234,38 @@ label.inline select {
   opacity: 0.7;
 }
 
+.beat-shade {
+  fill: #ffffff;
+  opacity: 0.035;
+}
+
+.beat-line.downbeat {
+  stroke: #f0b429;
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+
+.beat-line.upbeat {
+  stroke: #f0b429;
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+  opacity: 0.35;
+}
+
+.beat-label {
+  font-size: 14px;
+  fill: #f0b429;
+  pointer-events: none;
+}
+
+.beat-label.downbeat {
+  font-weight: 700;
+}
+
+.beat-label.upbeat {
+  opacity: 0.6;
+}
+
 .tick text {
   fill: #8b929b;
   font-size: 13px;

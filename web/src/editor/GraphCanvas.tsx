@@ -26,6 +26,8 @@ interface Props {
 /** Grab radius in screen pixels, so points stay easy to hit on small screens. */
 const HIT_PX = 12
 const TICKS = Array.from({ length: 11 }, (_, i) => i / 10)
+/** One cycle is one bar of four beats: downbeats on 0/25/50/75, upbeats ("&") halfway between. */
+const BEATS = [0, 1, 2, 3].map((b) => ({ n: b + 1, x: b / 4 }))
 
 export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onStroke }: Props) {
   const t = useStrings()
@@ -121,6 +123,9 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
         </clipPath>
       </defs>
       <rect className="plot-bg" x={PLOT.left} y={PLOT.top} width={PLOT.width} height={PLOT.height} />
+      {BEATS.filter((b) => b.n % 2 === 0).map((b) => (
+        <rect key={`shade${b.n}`} className="beat-shade" x={toSvg(b.x, 0)[0]} y={PLOT.top} width={PLOT.width / 4} height={PLOT.height} />
+      ))}
       {minorXs.map((x) => (
         <line key={`mx${x}`} className="grid-line minor" x1={toSvg(x, 0)[0]} x2={toSvg(x, 0)[0]} y1={PLOT.top} y2={PLOT.top + PLOT.height} />
       ))}
@@ -133,6 +138,22 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
           <line className="grid-line" y1={toSvg(0, v)[1]} y2={toSvg(0, v)[1]} x1={PLOT.left} x2={PLOT.left + PLOT.width} />
         </g>
       ))}
+      {BEATS.map((b) => {
+        const down = toSvg(b.x, 0)[0]
+        const up = toSvg(b.x + 1 / 8, 0)[0]
+        return (
+          <g key={`beat${b.n}`}>
+            <line className="beat-line downbeat" x1={down} x2={down} y1={PLOT.top} y2={PLOT.top + PLOT.height} />
+            <line className="beat-line upbeat" x1={up} x2={up} y1={PLOT.top} y2={PLOT.top + PLOT.height} />
+            <text className="beat-label downbeat" x={down + 6} y={PLOT.top + 16}>
+              {b.n}
+            </text>
+            <text className="beat-label upbeat" x={up + 6} y={PLOT.top + 16}>
+              &amp;
+            </text>
+          </g>
+        )
+      })}
       {TICKS.map((v) => (
         <g key={`t${v}`} className="tick">
           <text x={toSvg(v, 0)[0]} y={PLOT.top + PLOT.height + 22} textAnchor="middle">

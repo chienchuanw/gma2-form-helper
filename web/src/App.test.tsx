@@ -211,6 +211,15 @@ describe('App', () => {
     expect(new Set(modes())).toEqual(new Set(['step_end']))
   })
 
+  it('marks the four beats of the bar and the upbeats between them', () => {
+    render(<App />)
+    const svg = screen.getByRole('application')
+
+    expect([...svg.querySelectorAll('.beat-label')].map((t) => t.textContent)).toEqual(['1', '&', '2', '&', '3', '&', '4', '&'])
+    expect(svg.querySelectorAll('.beat-line.downbeat')).toHaveLength(4)
+    expect(svg.querySelectorAll('.beat-line.upbeat')).toHaveLength(4)
+  })
+
   it('adds a point where the graph is clicked', () => {
     render(<App />)
     const svg = screen.getByRole('application')
