@@ -36,7 +36,7 @@ const en = {
   copyTable: 'Copy table',
   copied: 'Copied',
   canvasLabel: 'Form graph editor. Click to add a point, drag to move it.',
-  canvasHint: 'Click to add a point · drag to move · Delete removes the selected point',
+  canvasHint: 'Click to add a point · drag to move · Delete removes the selected point · one cycle = one bar: beats 1–4 and their upbeats (&)',
   selectedMode: 'Mode of selected segment',
   approximate: 'All segments are Spline with no Break: MA draws this kind of curve slightly differently, so the preview is approximate.',
   warnings: {
@@ -88,7 +88,7 @@ const zh: Strings = {
   copyTable: '複製表格',
   copied: '已複製',
   canvasLabel: 'Form graph 編輯區。點一下新增點，拖曳移動點。',
-  canvasHint: '點一下新增點 · 拖曳移動 · Delete 刪除選取的點',
+  canvasHint: '點一下新增點 · 拖曳移動 · Delete 刪除選取的點 · 一個循環 = 一小節：第 1–4 拍與反拍（&）',
   selectedMode: '選取段落的 Mode',
   approximate: '所有段落都是 Spline 且沒有 Break：MA 對這類曲線的畫法略有不同，預覽為近似。',
   warnings: {
