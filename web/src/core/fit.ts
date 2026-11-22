@@ -340,6 +340,7 @@ function fitSteps(s: Sample[], tol: number, grid: { x: number; y: number } | nul
   const out: Point[] = []
   for (const st of steps) {
     const p: Point = { x: sx(st.x), y: sy((st.lo + st.hi) / 2), mode: 'step_end' }
+    if (p.x >= 1 && out.length > 0) break // a step starting at the end of the cycle has no width
     const prev = out[out.length - 1]
     if (prev && prev.x === p.x) out[out.length - 1] = p // a later step on the same grid line wins
     else if (!prev || prev.y !== p.y) out.push(p) // merge equal neighbours

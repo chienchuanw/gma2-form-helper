@@ -192,6 +192,25 @@ describe('App', () => {
     expect(within(rows()[1]).getByLabelText('X 2')).toHaveValue(25)
   })
 
+  it('locks drawn strokes to one mode and re-fits the last stroke when it changes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const svg = screen.getByRole('application')
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 1064, height: 548 } as DOMRect)
+    await user.click(screen.getByRole('button', { name: 'Draw' }))
+    await user.selectOptions(screen.getByLabelText('Draw mode'), 'linear')
+
+    const at = (x: number, y: number) => ({ clientX: 48 + x * 1000, clientY: 16 + (1 - y) * 500, pointerId: 1, isPrimary: true })
+    fireEvent.pointerDown(svg, at(0, 0.5))
+    for (let i = 1; i <= 100; i++) fireEvent.pointerMove(svg, at(i / 100, 0.5 + 0.4 * Math.sin((2 * Math.PI * i) / 100)))
+    fireEvent.pointerUp(svg, at(1, 0.5))
+    const modes = () => rows().map((r) => (within(r).getByLabelText(/^Mode \d+$/) as HTMLSelectElement).value)
+    expect(new Set(modes())).toEqual(new Set(['linear']))
+
+    await user.selectOptions(screen.getByLabelText('Draw mode'), 'step')
+    expect(new Set(modes())).toEqual(new Set(['step_end']))
+  })
+
   it('adds a point where the graph is clicked', () => {
     render(<App />)
     const svg = screen.getByRole('application')

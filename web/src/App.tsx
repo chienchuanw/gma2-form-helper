@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useRef, useState, type ChangeEvent } from 'react'
 import { analyzeGraph } from './core/evaluate'
-import { fitStroke, precisionToTolerance, strokeSpan, type Sample } from './core/fit'
+import { fitStroke, precisionToTolerance, strokeSpan, type FitMode, type Sample } from './core/fit'
 import type { Form } from './core/model'
-import { tableText } from './core/table'
+import { MODE_LABELS, tableText } from './core/table'
 import { DEFAULT_VERSION, exportFileName, parseFormsXml, serializeFormsXml } from './core/xml'
 import { FormPicker } from './editor/FormPicker'
 import { GraphCanvas, type SnapGrid, type Tool } from './editor/GraphCanvas'
@@ -22,6 +22,7 @@ export default function App() {
   const [snapOn, setSnapOn] = useState(true)
   const [tool, setTool] = useState<Tool>('edit')
   const [precision, setPrecision] = useState(5)
+  const [drawMode, setDrawMode] = useState<FitMode>('auto')
   /** The last freehand stroke, so the precision slider can re-fit it. */
   const lastStroke = useRef<{ id: number; samples: Sample[] } | null>(null)
   const [version, setVersion] = useState(DEFAULT_VERSION)
@@ -70,9 +71,9 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const fitInto = (id: number, samples: Sample[], p: number) => {
+  const fitInto = (id: number, samples: Sample[], p: number, mode: FitMode) => {
     const span = strokeSpan(samples)
-    const points = fitStroke(samples, { tolerance: precisionToTolerance(p), grid: snapOn ? SNAP : null })
+    const points = fitStroke(samples, { tolerance: precisionToTolerance(p), grid: snapOn ? SNAP : null, mode })
     if (!span || points.length === 0) return
     dispatch({ type: 'drawStroke', stroke: id, ...span, points })
   }
@@ -80,14 +81,23 @@ export default function App() {
   const onStroke = (samples: Sample[]) => {
     const id = (lastStroke.current?.id ?? 0) + 1
     lastStroke.current = { id, samples }
-    fitInto(id, samples, precision)
+    fitInto(id, samples, precision, drawMode)
+  }
+
+  // Re-fit the last stroke with new settings, but only while it is still the latest edit.
+  const refit = (p: number, mode: FitMode) => {
+    const last = lastStroke.current
+    if (last && isLatestStroke(history, last.id)) fitInto(last.id, last.samples, p, mode)
   }
 
   const onPrecision = (p: number) => {
     setPrecision(p)
-    // Re-fit only while the stroke is still the latest edit.
-    const last = lastStroke.current
-    if (last && isLatestStroke(history, last.id)) fitInto(last.id, last.samples, p)
+    refit(p, drawMode)
+  }
+
+  const onDrawMode = (mode: FitMode) => {
+    setDrawMode(mode)
+    refit(precision, mode)
   }
 
   const onImport = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -184,6 +194,17 @@ export default function App() {
                 {t.toolDraw}
               </button>
             </div>
+            {tool === 'draw' && (
+              <label className="inline" title={t.drawModeHelp}>
+                {t.drawMode}
+                <select value={drawMode} onChange={(e) => onDrawMode(e.target.value as FitMode)}>
+                  <option value="auto">{t.drawModeAuto}</option>
+                  <option value="linear">{MODE_LABELS.linear}</option>
+                  <option value="spline">{MODE_LABELS.spline}</option>
+                  <option value="step">{MODE_LABELS.step_end}</option>
+                </select>
+              </label>
+            )}
             <label className="inline" title={t.precisionHelp}>
               {t.precision}
               <input type="range" min={1} max={10} step={1} value={precision} onChange={(e) => onPrecision(Number(e.target.value))} />
