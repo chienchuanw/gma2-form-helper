@@ -1,5 +1,5 @@
 import { JUMP_WIDTH, evaluate } from './evaluate'
-import { clamp01, roundCoord, snap, type Mode, type Point } from './model'
+import { clamp01, roundCoord, snap, sortPoints, type Mode, type Point } from './model'
 
 export interface FitOptions {
   /** Largest allowed distance between the stroke and the fitted curve (0–1 scale). */
@@ -12,6 +12,12 @@ export interface FitOptions {
    * staircase of Step (End) points.
    */
   mode?: FitMode
+  /**
+   * The graph's current points. Points outside the drawn span are kept when the
+   * stroke is merged in, and they change how the curve bends next to it, so the
+   * fit is measured against the merged graph.
+   */
+  context?: readonly Point[]
 }
 
 export type FitMode = 'auto' | 'linear' | 'spline' | 'step'
@@ -55,13 +61,26 @@ export function fitStroke(samples: readonly Sample[], opts: FitOptions): Point[]
   // Key point indices into each piece's resampled stroke. RDP is a straight-line
   // simplifier, so seed coarsely and let the curve refinement add what it needs.
   const grid = opts.grid ?? null
+  const from = pieces[0][0].x
+  const lastPiece = pieces[pieces.length - 1]
+  const to = lastPiece[lastPiece.length - 1].x
+  const context = opts.context ?? []
+  // Kept points of the graph: the same rule the editor uses when it merges the stroke in.
+  const kept = (pts: Point[]) => {
+    const lo = Math.min(from, ...pts.map((p) => p.x))
+    const hi = Math.max(to, ...pts.map((p) => p.x))
+    return context.filter((p) => p.x < lo - 1e-9 || p.x > hi + 1e-9)
+  }
+  const bridged = kept([]).length > 0
+  const merged = (pts: Point[]) => (context.length ? drawable(sortPoints([...kept(pts), ...pts])) : pts)
+
   const keys = pieces.map((p) => rdp(p, 0, p.length - 1, tol * 4))
-  let points = build(pieces, keys, tol, grid, lock)
+  let points = build(pieces, keys, tol, grid, lock, bridged)
   for (let round = 0; round < MAX_REFINE; round++) {
-    const worst = worstSample(pieces, keys, points, tol)
+    const worst = worstSample(pieces, keys, merged(points), tol)
     if (!worst) break
     keys[worst.piece] = [...keys[worst.piece], worst.index].sort((a, b) => a - b)
-    points = build(pieces, keys, tol, grid, lock)
+    points = build(pieces, keys, tol, grid, lock, bridged)
   }
   return drawable(points)
 }
@@ -219,6 +238,8 @@ function build(
   tol: number,
   grid: { x: number; y: number } | null,
   lock: Exclude<FitMode, 'step'>,
+  /** The stroke's last point leads into kept points of the graph, across an undrawn part. */
+  bridged: boolean,
 ): Point[] {
   const sx = (x: number) => roundCoord(grid ? snap(x, grid.x) : x)
   const sy = (y: number) => roundCoord(grid ? snap(y, grid.y) : y)
@@ -269,8 +290,9 @@ function build(
     segs[segs.length - 1].jump = false
     segs[segs.length - 1].curved = segs[segs.length - 1].curved || segs[0].curved
   } else {
-    // Across the undrawn part (or a jump at x = 100): straight, unless locked to Spline.
-    last.curved = lock === 'spline' && !wrapJump
+    // Across the undrawn part (or a jump at x = 100): straight, unless locked to
+    // Spline and nothing else of the graph lies in between.
+    last.curved = lock === 'spline' && !wrapJump && !bridged
   }
 
   // A flat straight run into a jump (or into the wrap, where the value jumps back

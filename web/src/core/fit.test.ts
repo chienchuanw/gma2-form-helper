@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { analyzeGraph, evaluate } from './evaluate'
-import { fitStroke, precisionToTolerance } from './fit'
-import type { Graph } from './model'
+import { drawable, fitStroke, precisionToTolerance } from './fit'
+import { sortPoints, type Graph, type Point } from './model'
 
 type S = { x: number; y: number }
 
@@ -228,6 +228,33 @@ describe('fitStroke', () => {
       const pts = fitStroke(stroke((x) => 0.1 + 0.8 * x, 0, 1, 200, 0), { tolerance: precisionToTolerance(5), mode: 'step', grid: { x: 0.125, y: 0.1 } })
 
       expect(pts.some((p) => p.x >= 1)).toBe(false)
+    })
+
+    it('stays within tolerance after merging a partial stroke into an existing graph (fuzz)', () => {
+      let seed = 11
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+      const base: Point[] = [
+        { x: 0, y: 0, mode: 'spline' },
+        { x: 0.5, y: 1, mode: 'spline' },
+      ]
+      let bad = 0
+      let total = 0
+      for (let n = 0; n < 100; n++) {
+        const a = rnd(), b = rnd() * 4, c = rnd(), from = 0.05 + rnd() * 0.3, to = from + 0.2 + rnd() * 0.4
+        const f = (x: number) => 0.5 + 0.35 * a * Math.sin(b * Math.PI * x + c)
+        const s = stroke(f, from, Math.min(0.95, to), 150, 0)
+        for (const mode of ['auto', 'linear', 'spline'] as const) {
+          const pts = fitStroke(s, { tolerance: 0.02, mode, context: base })
+          const lo = Math.min(from, pts[0].x), hi = Math.max(Math.min(0.95, to), pts[pts.length - 1].x)
+          const merged = drawable(sortPoints([...base.filter((p) => p.x < lo - 1e-9 || p.x > hi + 1e-9), ...pts]))
+          const g = { color: '', points: merged }
+          total++
+          if (maxError(g, f, from, Math.min(0.95, to)) > 0.03) bad++
+        }
+      }
+      // Within the drawn span. Outside it, existing Spline points of the graph may still
+      // bend into the new points; MA draws that the same way and analyzeGraph flags overshoots.
+      expect(bad / total).toBeLessThan(0.05)
     })
 
     it('keeps locked fits drawable in MA, with and without snapping (fuzz)', () => {

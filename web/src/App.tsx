@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, useState, type ChangeEvent } from 'react'
 import { analyzeGraph } from './core/evaluate'
 import { fitStroke, precisionToTolerance, strokeSpan, type FitMode, type Sample } from './core/fit'
-import type { Form } from './core/model'
+import type { Form, Point } from './core/model'
 import { MODE_LABELS, tableText } from './core/table'
 import { DEFAULT_VERSION, exportFileName, parseFormsXml, serializeFormsXml } from './core/xml'
 import { FormPicker } from './editor/FormPicker'
@@ -24,7 +24,7 @@ export default function App() {
   const [precision, setPrecision] = useState(5)
   const [drawMode, setDrawMode] = useState<FitMode>('auto')
   /** The last freehand stroke, so the precision slider can re-fit it. */
-  const lastStroke = useRef<{ id: number; samples: Sample[] } | null>(null)
+  const lastStroke = useRef<{ id: number; samples: Sample[]; context: readonly Point[] } | null>(null)
   const [version, setVersion] = useState(DEFAULT_VERSION)
   const [choices, setChoices] = useState<Form[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -71,23 +71,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const fitInto = (id: number, samples: Sample[], p: number, mode: FitMode) => {
+  const fitInto = (id: number, samples: Sample[], context: readonly Point[], p: number, mode: FitMode) => {
     const span = strokeSpan(samples)
-    const points = fitStroke(samples, { tolerance: precisionToTolerance(p), grid: snapOn ? SNAP : null, mode })
+    const points = fitStroke(samples, { tolerance: precisionToTolerance(p), grid: snapOn ? SNAP : null, mode, context })
     if (!span || points.length === 0) return
     dispatch({ type: 'drawStroke', stroke: id, ...span, points })
   }
 
   const onStroke = (samples: Sample[]) => {
     const id = (lastStroke.current?.id ?? 0) + 1
-    lastStroke.current = { id, samples }
-    fitInto(id, samples, precision, drawMode)
+    // The graph as it is before the stroke: its other points shape the fit.
+    const context = graph.points
+    lastStroke.current = { id, samples, context }
+    fitInto(id, samples, context, precision, drawMode)
   }
 
   // Re-fit the last stroke with new settings, but only while it is still the latest edit.
   const refit = (p: number, mode: FitMode) => {
     const last = lastStroke.current
-    if (last && isLatestStroke(history, last.id)) fitInto(last.id, last.samples, p, mode)
+    if (last && isLatestStroke(history, last.id)) fitInto(last.id, last.samples, last.context, p, mode)
   }
 
   const onPrecision = (p: number) => {
