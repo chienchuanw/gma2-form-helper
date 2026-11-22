@@ -27,36 +27,56 @@ ripples that decay away from it.
 
 How a chain ends:
 
+- **Its own break** (its first segment is Break at Start, or its last segment is
+  Break at End): a *parabolic* end, `m0 + m1 = 2 * secant` of that end segment.
+  The curve meets the neighbouring segment with a visible corner. Built-in Bump
+  and Swing use a Break at Start on their first point and a Break at End on their
+  last spline point.
 - **Next to a Linear segment**: the chain takes that segment's slope, so the
   curve joins the line smoothly (it can overshoot the point to do so).
-- **Next to a Step segment**: slope 0 (steps are flat).
-- **At a break**: natural end (zero curvature). The curve meets the following
-  segment with a visible corner. Built-in Bump and Swing use a Break at Start on
-  their first point and a Break at End on their last spline point.
+- **Next to a broken chain** (the next segment is Break at Start, or the previous
+  one is Break at End): the chain takes the secant of that neighbouring segment,
+  joining the broken chain smoothly from outside while the broken chain itself
+  keeps its corner. Measured for the Break at Start side (Form 101); the Break at
+  End side is assumed symmetric.
+- **Next to a Step segment**: slope 0 (steps are flat). Measured for both Step
+  (Start) and Step (End).
 - **No ends at all** (every segment is spline and there are no breaks): one
   closed, periodic spline.
 
+Taking a neighbour's slope means a chain next to a *near-vertical* segment (say
+a Linear segment 0.3 wide) is clamped to a huge slope and shoots far off the
+chart. MA does exactly the same (captured), so the tool reproduces it and
+`analyzeGraph()` warns `overshoot`.
+
 ## Accuracy
 
-Error of `evaluate()` against curves pixel-extracted from the Graph Editor, on
-the 0–100 scale. Pixel extraction itself is good to about ±1.
+Error of `evaluate()` against the reference curves in `ma_curves.json` (values on
+the 0–100 scale, sampled every 2 units). Pixel extraction is good to about ±0.5,
+more on steep slopes where one pixel in x is ~0.1 unit.
 
 | Case | RMS | Max |
 |------|-----|-----|
-| Spline chain between Linear segments | 0.3 | 1.1 |
-| Spline chains next to Step (End) | 0.2 | 0.8 |
-| Bump (paired breaks) | 0.3 | 1.2 |
-| Swing (paired breaks, then Linear) | 0.3 | 1.0 |
-| Closed spline, 2 points | 0.2 | 0.7 |
-| Closed spline, 8 even points with one raised | 0.6 | 1.3 |
-| Closed spline, 5 points | 1.2 | 2.8 |
-| Closed spline, uneven spacing | 2.7 | 5.6 |
-| Closed spline, uneven spacing with one raised | 2.0 | 6.0 |
+| Spline chain between Linear segments | 0.24 | 0.62 |
+| Spline chains next to Step (End) | 0.20 | 0.54 |
+| Spline chain next to Step (Start) | 0.20 | 0.54 |
+| Breaks in the middle, Linear and Step neighbours (Form 101) | 0.34 | 1.12 |
+| Bump (paired breaks) | 0.29 | 0.89 |
+| Swing (paired breaks, then Linear) | 0.21 | 0.66 |
+| Closed spline, 2 points | 0.22 | 0.49 |
+| Closed spline, 8 even points with one raised | 0.54 | 1.21 |
+| Closed spline, 5 points | 1.14 | 2.47 |
+| Closed spline, uneven spacing with one raised | 1.81 | 5.71 |
+| Closed spline, uneven spacing | 2.71 | 5.44 |
 
-Everything except the **closed all-spline** case matches within pixel accuracy.
-For closed splines MA's curve is close to, but not exactly, a periodic C2 cubic.
-The gap grows with uneven point spacing. `analyzeGraph()` reports such graphs as
-`approximate` so the UI can say so.
+In every measured case with chain ends (Linear, Step or break neighbours) the
+model matches within extraction accuracy. For closed all-spline graphs MA's
+curve is close to, but not exactly, a periodic C2 cubic, and the gap grows with
+uneven spacing; `analyzeGraph()` reports those graphs as `approximate`.
+
+Gaps in the reference data: samples on vertical strokes (step jumps) are
+excluded, Swing's flat tail lies on the x axis and could not be separated from
+it, and part of the wrap region of the 8-point case was hidden by the crosshair.
 
 Models tried for the closed case and rejected (all worse): local Catmull-Rom
 (central difference), average-of-secants, Bessel tangents, uniform and
@@ -72,8 +92,9 @@ padding, and partially converged Jacobi/Gauss-Seidel solves.
   jump as a vertical step.
 - **Unpaired breaks** in an all-spline graph (a Break at Start without a later
   Break at End, or the reverse): MA draws segments that shoot far off the chart.
-  `analyzeGraph()` warns `unpairedBreak`; the tool draws a natural spline
-  instead.
+  `analyzeGraph()` warns `unpairedBreak`; the tool draws its own chain model
+  instead. Unpaired breaks in graphs that also contain Linear or Step segments
+  were not measured.
 
 ## Method
 
