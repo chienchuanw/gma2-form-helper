@@ -99,6 +99,23 @@ describe('fitStroke', () => {
     }
   })
 
+  it('does not stack points on one grid line when snapping a detailed fit', () => {
+    const s = stroke((x) => 0.5 + 0.3 * Math.sin(2 * Math.PI * x) + 0.15 * Math.sin(10 * Math.PI * x))
+    const pts = fitStroke(s, { tolerance: precisionToTolerance(10), grid: { x: 0.125, y: 0.1 } })
+    const xs = pts.map((p) => p.x)
+
+    expect(new Set(xs).size).toBe(xs.length)
+  })
+
+  it('keeps both sides of a drawn jump when snapping', () => {
+    const f = (x: number) => (x < 0.5 ? 0.2 + 0.6 * x : 0.9)
+    const s = [...stroke(f, 0, 0.5, 100), ...stroke(f, 0.5, 1, 100)]
+    const pts = fitStroke(s, { tolerance: 0.02, grid: { x: 0.125, y: 0.1 } })
+
+    expect(evaluate({ color: '', points: pts }, 0.45)).toBeLessThan(0.6)
+    expect(evaluate({ color: '', points: pts }, 0.75)).toBeCloseTo(0.9, 1)
+  })
+
   it('returns nothing for a stroke too short to fit', () => {
     expect(fitStroke([{ x: 0.5, y: 0.5 }], { tolerance: 0.02 })).toEqual([])
   })

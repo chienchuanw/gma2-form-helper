@@ -71,26 +71,30 @@ function monotonic(samples: readonly Sample[]): Sample[] {
  */
 function split(s: Sample[]): Sample[][] {
   if (s.length === 0) return []
-  const cuts: number[] = [] // index where a new piece starts
+  // Each cut: the piece before ends at `end` (bottom of the climb, inclusive) and
+  // the next starts at `start` (where the climb has reached its new level).
+  const cuts: { end: number; start: number }[] = []
   let i = 0
   while (i < s.length - 1) {
     let j = i
     while (j + 1 < s.length && s[j + 1].x - s[i].x < JUMP_DX) j++
-    const steep = j > i && Math.abs(s[j].y - s[i].y) >= JUMP_DY && s[j].x - s[i].x < JUMP_DX
-    if (steep) {
-      cuts.push(j)
-      i = j
+    const rise = s[j].y - s[i].y
+    if (j > i && Math.abs(rise) >= JUMP_DY) {
+      let start = i + 1
+      while (start < j && Math.abs(s[j].y - s[start].y) > Math.abs(rise) * 0.1) start++
+      cuts.push({ end: i, start })
+      i = start
     } else {
       i++
     }
   }
   const raw: Sample[][] = []
-  let start = 0
+  let from = 0
   for (const c of cuts) {
-    raw.push(s.slice(start, c))
-    start = c
+    raw.push(s.slice(from, c.end + 1))
+    from = c.start
   }
-  raw.push(s.slice(start))
+  raw.push(s.slice(from))
   return raw.filter((p) => p.length >= 1).map(resample)
 }
 
@@ -173,12 +177,17 @@ function build(pieces: Sample[][], keys: number[][], tol: number): Point[] {
     ks.forEach((k, n) => {
       const next = ks[n + 1]
       const curved = next !== undefined && farthest(s, k, next)[1] > tol / 2
+      const jump = next === undefined && pi < pieces.length - 1
+      // The top of a jump sits at the jump's x, so both sides share it exactly.
+      const x = jump ? pieces[pi + 1][0].x : s[k].x
+      const prev = segs[segs.length - 1]
+      if (prev && prev.x === roundCoord(x) && prev.y === roundCoord(s[k].y)) segs.pop() // same point twice
       segs.push({
-        x: roundCoord(s[k].x),
+        x: roundCoord(x),
         y: roundCoord(s[k].y),
         curved,
         corner: n > 0 && next !== undefined && turn(s, k) > CORNER,
-        jump: next === undefined && pi < pieces.length - 1,
+        jump,
       })
     })
   })
@@ -248,13 +257,21 @@ function worstSample(pieces: Sample[][], keys: number[][], points: Point[], tol:
   return worst as { piece: number; index: number; d: number } | null
 }
 
+/**
+ * Snap to the grid. Points that land on the same grid line as the previous one
+ * are dropped (they would become an accidental vertical jump), except the two
+ * sides of a jump that was actually drawn, which already shared their x.
+ */
 function snapPoints(points: Point[], grid: { x: number; y: number }): Point[] {
   const out: Point[] = []
+  let prevX: number | null = null
   for (const p of points) {
     const q = { ...p, x: roundCoord(Math.round(p.x / grid.x) * grid.x), y: roundCoord(Math.round(p.y / grid.y) * grid.y) }
     const prev = out[out.length - 1]
-    if (prev && prev.x === q.x && prev.y === q.y) continue
+    const drawnJump = prevX !== null && p.x === prevX
+    if (prev && prev.x === q.x && (!drawnJump || prev.y === q.y)) continue
     out.push(q)
+    prevX = p.x
   }
   return out
 }
