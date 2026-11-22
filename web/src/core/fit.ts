@@ -6,7 +6,15 @@ export interface FitOptions {
   tolerance: number
   /** Snap the resulting points to this grid (0–1 steps), if given. */
   grid?: { x: number; y: number } | null
+  /**
+   * auto (default) picks modes from the stroke; linear / spline use only that
+   * kind of segment (a drawn jump stays a vertical edge); step draws a
+   * staircase of Step (End) points.
+   */
+  mode?: FitMode
 }
+
+export type FitMode = 'auto' | 'linear' | 'spline' | 'step'
 
 /** A pointer sample in 0–1 graph coordinates. */
 export interface Sample {
@@ -39,6 +47,8 @@ const MAX_REFINE = 60
  */
 export function fitStroke(samples: readonly Sample[], opts: FitOptions): Point[] {
   const tol = Math.max(1e-4, opts.tolerance)
+  const lock = opts.mode ?? 'auto'
+  if (lock === 'step') return fitSteps(monotonic(samples), tol, opts.grid ?? null)
   const pieces = split(monotonic(samples))
   if (pieces.length === 0) return []
 
@@ -46,12 +56,12 @@ export function fitStroke(samples: readonly Sample[], opts: FitOptions): Point[]
   // simplifier, so seed coarsely and let the curve refinement add what it needs.
   const grid = opts.grid ?? null
   const keys = pieces.map((p) => rdp(p, 0, p.length - 1, tol * 4))
-  let points = build(pieces, keys, tol, grid)
+  let points = build(pieces, keys, tol, grid, lock)
   for (let round = 0; round < MAX_REFINE; round++) {
     const worst = worstSample(pieces, keys, points, tol)
     if (!worst) break
     keys[worst.piece] = [...keys[worst.piece], worst.index].sort((a, b) => a - b)
-    points = build(pieces, keys, tol, grid)
+    points = build(pieces, keys, tol, grid, lock)
   }
   return drawable(points)
 }
@@ -203,7 +213,13 @@ interface Seg {
 }
 
 /** Points with modes from the key indices of every piece, snapped to the grid if given. */
-function build(pieces: Sample[][], keys: number[][], tol: number, grid: { x: number; y: number } | null): Point[] {
+function build(
+  pieces: Sample[][],
+  keys: number[][],
+  tol: number,
+  grid: { x: number; y: number } | null,
+  lock: Exclude<FitMode, 'step'>,
+): Point[] {
   const sx = (x: number) => roundCoord(grid ? snap(x, grid.x) : x)
   const sy = (y: number) => roundCoord(grid ? snap(y, grid.y) : y)
   const segs: Seg[] = []
@@ -211,7 +227,8 @@ function build(pieces: Sample[][], keys: number[][], tol: number, grid: { x: num
     const ks = keys[pi]
     ks.forEach((k, n) => {
       const next = ks[n + 1]
-      const curved = next !== undefined && farthest(s, k, next)[1] > tol / 2
+      const curved =
+        next !== undefined && (lock === 'spline' || (lock === 'auto' && farthest(s, k, next)[1] > tol / 2))
       const jump = next === undefined && pi < pieces.length - 1
       // The top of a jump sits at the jump's x, so both sides share it exactly.
       const x = sx(jump ? pieces[pi + 1][0].x : s[k].x)
@@ -252,12 +269,13 @@ function build(pieces: Sample[][], keys: number[][], tol: number, grid: { x: num
     segs[segs.length - 1].jump = false
     segs[segs.length - 1].curved = segs[segs.length - 1].curved || segs[0].curved
   } else {
-    last.curved = false // across the undrawn part (or a jump at x = 100): straight
+    // Across the undrawn part (or a jump at x = 100): straight, unless locked to Spline.
+    last.curved = lock === 'spline' && !wrapJump
   }
 
   // A flat straight run into a jump (or into the wrap, where the value jumps back
   // to the start) is one Step (End) point: drop the point at the top of the jump.
-  for (let i = segs.length - 2; i >= 0; i--) {
+  for (let i = segs.length - 2; lock === 'auto' && i >= 0; i--) {
     const a = segs[i]
     const b = segs[i + 1]
     const intoJump = b.jump || (wrapJump && b === last)
@@ -281,7 +299,7 @@ function build(pieces: Sample[][], keys: number[][], tol: number, grid: { x: num
     // segment between two corners cannot curve (its ends would be parabolic).
     const startsAtCorner = cornerAt(i) && curvedAt(i - 1)
     const endsAtCorner = cornerAt(i + 1) && curvedAt(i + 1)
-    if (startsAtCorner && endsAtCorner) return 'linear'
+    if (startsAtCorner && endsAtCorner) return lock === 'spline' ? 'spline' : 'linear'
     if (startsAtCorner) return 'spline_break_start'
     if (endsAtCorner) return 'spline_break_end'
     return 'spline'
@@ -301,6 +319,32 @@ function worstSample(pieces: Sample[][], keys: number[][], points: Point[], tol:
     })
   })
   return worst as { piece: number; index: number; d: number } | null
+}
+
+/**
+ * A staircase of Step (End) points: each step holds the middle of a band at most
+ * 2 × tol tall, and a new step starts where the stroke leaves the band.
+ */
+function fitSteps(s: Sample[], tol: number, grid: { x: number; y: number } | null): Point[] {
+  if (s.length === 0) return []
+  const sx = (x: number) => roundCoord(grid ? snap(x, grid.x) : x)
+  const sy = (y: number) => roundCoord(grid ? snap(y, grid.y) : y)
+  const steps: { x: number; lo: number; hi: number }[] = [{ x: s[0].x, lo: s[0].y, hi: s[0].y }]
+  for (const p of s) {
+    const cur = steps[steps.length - 1]
+    const lo = Math.min(cur.lo, p.y)
+    const hi = Math.max(cur.hi, p.y)
+    if (hi - lo > 2 * tol) steps.push({ x: p.x, lo: p.y, hi: p.y })
+    else Object.assign(cur, { lo, hi })
+  }
+  const out: Point[] = []
+  for (const st of steps) {
+    const p: Point = { x: sx(st.x), y: sy((st.lo + st.hi) / 2), mode: 'step_end' }
+    const prev = out[out.length - 1]
+    if (prev && prev.x === p.x) out[out.length - 1] = p // a later step on the same grid line wins
+    else if (!prev || prev.y !== p.y) out.push(p) // merge equal neighbours
+  }
+  return out
 }
 
 /**

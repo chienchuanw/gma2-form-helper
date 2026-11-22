@@ -186,4 +186,57 @@ describe('fitStroke', () => {
     for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeGreaterThanOrEqual(counts[i - 1])
     expect(counts[4]).toBeGreaterThan(counts[0])
   })
+
+  describe('with a locked mode', () => {
+    const sine = (x: number) => 0.5 + 0.4 * Math.sin(2 * Math.PI * x)
+
+    it('uses only Linear segments when locked to Linear', () => {
+      const pts = fitStroke(stroke(sine), { tolerance: 0.02, mode: 'linear' })
+
+      expect(pts.every((p) => p.mode === 'linear')).toBe(true)
+      expect(maxError({ color: '', points: pts }, sine)).toBeLessThan(0.03)
+    })
+
+    it('uses only Spline segments when locked to Spline, apart from drawn jumps', () => {
+      const f = (x: number) => (x < 0.5 ? 0.2 + 0.5 * x : 0.9)
+      const s = [...stroke(f, 0, 0.5, 100), ...stroke(f, 0.5, 1, 100)]
+      const pts = fitStroke(s, { tolerance: 0.02, mode: 'spline' })
+      const g = { color: '', points: pts }
+
+      pts.forEach((p, i) => {
+        const next = pts[(i + 1) % pts.length]
+        const zeroWidth = next.x + (i === pts.length - 1 ? 1 : 0) - p.x <= 0.002
+        if (!zeroWidth) expect(p.mode.startsWith('spline')).toBe(true)
+      })
+      expect(analyzeGraph(g).warnings.filter((w) => w !== 'overshoot')).toEqual([])
+      expect(maxError(g, f, 0, 0.49)).toBeLessThan(0.03)
+    })
+
+    it('draws a staircase of Step (End) points when locked to Step', () => {
+      const ramp = (x: number) => x
+      const coarse = fitStroke(stroke(ramp, 0, 1, 300, 0), { tolerance: 0.05, mode: 'step' })
+      const fine = fitStroke(stroke(ramp, 0, 1, 300, 0), { tolerance: 0.01, mode: 'step' })
+
+      expect(coarse.every((p) => p.mode === 'step_end')).toBe(true)
+      expect(fine.length).toBeGreaterThan(coarse.length)
+      // Within the tolerance, plus the 0.1-unit rounding of where each step starts.
+      expect(maxError({ color: '', points: coarse }, ramp)).toBeLessThanOrEqual(0.055)
+    })
+
+    it('keeps locked fits drawable in MA, with and without snapping (fuzz)', () => {
+      let seed = 3
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+      for (let n = 0; n < 60; n++) {
+        const a = rnd(), b = rnd() * 6, c = rnd()
+        const s = stroke((x) => 0.5 + 0.4 * a * Math.sin(b * Math.PI * x + c), rnd() * 0.3, 0.7 + rnd() * 0.3, 150, 0.01)
+        for (const mode of ['linear', 'spline', 'step'] as const) {
+          for (const grid of [null, { x: 0.125, y: 0.1 }]) {
+            const pts = fitStroke(s, { tolerance: 0.02, grid, mode })
+            expect(analyzeGraph({ color: '', points: pts }).warnings.filter((w) => w !== 'overshoot')).toEqual([])
+            expect(pts.map((p) => p.x)).toEqual([...pts.map((p) => p.x)].sort((p, q) => p - q))
+          }
+        }
+      }
+    })
+  })
 })
