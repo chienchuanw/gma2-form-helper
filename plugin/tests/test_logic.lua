@@ -84,13 +84,15 @@ eq(M.list_cmd("/home/user/gma2/importexport", "LINUX"), 'ls -t "/home/user/gma2/
 eq(M.strip_number("Flyout 123", 123), "Flyout", "number removed")
 eq(M.strip_number("Ramp 50 7", 7), "Ramp 50", "only the trailing pool number")
 
--- imported: did the slot really change?
-eq(M.imported(nil, { handle = 5, name = "A" }, "A"), true, "empty slot now filled")
-eq(M.imported(nil, nil, "A"), false, "nothing arrived")
-eq(M.imported({ handle = 5, name = "Old" }, { handle = 9, name = "A" }, "A"), true, "replaced with the expected Form")
-eq(M.imported({ handle = 5, name = "Old" }, { handle = 5, name = "Old" }, nil), false, "unchanged slot is not a success")
-eq(M.imported({ handle = 5, name = "Old" }, { handle = 9, name = "Other" }, nil), true, "replaced, name unknown beforehand")
-eq(M.imported({ handle = 5, name = "Old" }, { handle = 9, name = "Other" }, "A"), false, "a different Form than the file holds")
+-- imported: did the slot really change? A replaced Form keeps its handle
+-- (lab-verified), so only the name can tell, and a same-name re-import cannot.
+eq(M.imported(nil, { name = "A" }, "A"), "yes", "empty slot now filled")
+eq(M.imported(nil, nil, "A"), "no", "nothing arrived")
+eq(M.imported({ name = "Old" }, { name = "A" }, "A"), "yes", "replaced with the expected Form")
+eq(M.imported({ name = "A" }, { name = "A" }, "A"), "unknown", "same-name re-import cannot be confirmed")
+eq(M.imported({ name = "Old" }, { name = "Old" }, "A"), "no", "slot unchanged")
+eq(M.imported({ name = "Old" }, { name = "Old" }, nil), "unknown", "USB, name unchanged: cannot tell")
+eq(M.imported({ name = "Old" }, { name = "New" }, nil), "yes", "USB, name changed")
 
 print(string.format("%d checks, %d failed", count, fails))
 os.exit(fails == 0 and 0 or 1)
