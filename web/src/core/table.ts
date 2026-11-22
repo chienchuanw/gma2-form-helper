@@ -19,8 +19,7 @@ export interface TableRow {
 
 /** A 0–1 value as MA shows it: 0–100 with two decimals. */
 export function formatCoord(v: number): string {
-  const s = (v * 100).toFixed(2)
-  return s === '-0.00' ? '0.00' : s
+  return (Math.round(v * 10000) / 100 + 0).toFixed(2) // + 0 turns -0 into 0
 }
 
 export function tableRows(graph: Graph): TableRow[] {
@@ -30,11 +29,6 @@ export function tableRows(graph: Graph): TableRow[] {
     y: formatCoord(p.y),
     mode: MODE_LABELS[p.mode],
   }))
-}
-
-/** Round a 0–1 value to one decimal on the 0–100 scale (0.001), clamped to 0–1. */
-export function roundCoord(v: number): number {
-  return Math.min(1, Math.max(0, Math.round(v * 1000) / 1000))
 }
 
 /** Tab-separated tables, one block per graph, for pasting into notes or a sheet. */

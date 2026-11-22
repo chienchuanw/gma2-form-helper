@@ -1,4 +1,4 @@
-import type { Graph, Mode, Point } from './model'
+import type { Graph, Mode } from './model'
 
 /** Modes whose curve is known exactly; the rest are drawn with an approximation. */
 export function isExactMode(mode: Mode): boolean {
@@ -17,44 +17,44 @@ export function evaluate(graph: Graph, t: number): number {
   if (n === 1) return pts[0].y
 
   let u = t - Math.floor(t)
-  let i = -1
-  for (let k = 0; k < n; k++) if (pts[k].x <= u) i = k
+  let i = pts.findLastIndex((q) => q.x <= u)
   if (i === -1) {
     i = n - 1
     u += 1
   }
 
-  const at = (k: number): Point => {
-    const wraps = Math.floor(k / n)
-    const q = pts[k - wraps * n]
-    return { ...q, x: q.x + wraps }
-  }
-  const a = at(i)
-  const b = at(i + 1)
-  const width = b.x - a.x
-  if (width <= 0) return b.y
-  const f = (u - a.x) / width
+  // Index k may run past either end; the point repeats with x shifted by whole periods.
+  const xAt = (k: number) => pts[((k % n) + n) % n].x + Math.floor(k / n)
+  const yAt = (k: number) => pts[((k % n) + n) % n].y
+  const ax = xAt(i)
+  const bx = xAt(i + 1)
+  const ay = pts[i].y
+  const by = yAt(i + 1)
+  const width = bx - ax
+  if (width <= 0) return by
+  const f = (u - ax) / width
+  const mode = pts[i].mode
 
-  switch (a.mode) {
+  switch (mode) {
     case 'linear':
-      return a.y + (b.y - a.y) * f
+      return ay + (by - ay) * f
     case 'step_end':
-      return a.y
+      return ay
     case 'step_start':
-      return b.y
+      return by
     default: {
-      const secant = (b.y - a.y) / width
-      const ma = a.mode === 'spline_break_start' ? secant : slope(at(i - 1), b, secant)
-      const mb = a.mode === 'spline_break_end' ? secant : slope(a, at(i + 2), secant)
-      return hermite(a.y, b.y, ma * width, mb * width, f)
+      const secant = (by - ay) / width
+      const ma = mode === 'spline_break_start' ? secant : slope(xAt(i - 1), yAt(i - 1), bx, by, secant)
+      const mb = mode === 'spline_break_end' ? secant : slope(ax, ay, xAt(i + 2), yAt(i + 2), secant)
+      return hermite(ay, by, ma * width, mb * width, f)
     }
   }
 }
 
 /** Central-difference tangent through the neighbours; falls back to the secant. */
-function slope(prev: Point, next: Point, fallback: number): number {
-  const dx = next.x - prev.x
-  return dx > 1e-9 ? (next.y - prev.y) / dx : fallback
+function slope(x0: number, y0: number, x1: number, y1: number, fallback: number): number {
+  const dx = x1 - x0
+  return dx > 1e-9 ? (y1 - y0) / dx : fallback
 }
 
 function hermite(y0: number, y1: number, m0: number, m1: number, f: number): number {

@@ -30,3 +30,13 @@ export interface Form {
   display2d: boolean
   graphs: Graph[]
 }
+
+/** Points sorted by x. Points sharing an x keep their order (MA's creation order), which is how vertical jumps are drawn. */
+export function sortPoints(points: Point[]): Point[] {
+  return [...points].sort((a, b) => a.x - b.x)
+}
+
+/** Round a 0–1 value to one decimal on the 0–100 scale (0.001), clamped to 0–1. Applied to points the tool creates or moves. */
+export function roundCoord(v: number): number {
+  return Math.min(1, Math.max(0, Math.round(v * 1000) / 1000))
+}

@@ -44,8 +44,9 @@ describe('parseFormsXml', () => {
   })
 
   it('reads graph name and color and the display_2d flag', () => {
-    const circle = parseFormsXml(builtinXml).find((f) => f.name === 'Circle')!
-    const flyout = parseFormsXml(builtinXml).find((f) => f.name === 'Flyout')!
+    const forms = parseFormsXml(builtinXml)
+    const circle = forms.find((f) => f.name === 'Circle')!
+    const flyout = forms.find((f) => f.name === 'Flyout')!
 
     expect(circle.display2d).toBe(true)
     expect(circle.graphs[1].color).toBe('30c0c0')
@@ -96,7 +97,7 @@ describe('serializeFormsXml', () => {
 
     expect(serializeFormsXml(forms)).toContain('major_vers="3" minor_vers="9" stream_vers="60"')
     expect(serializeFormsXml(forms)).toContain('grandma2/xml/3.9.60/MA.xsd')
-    const old = serializeFormsXml(forms, { version: { major: 3, minor: 3, stream: 4 } })
+    const old = serializeFormsXml(forms, { version: '3.3.4' })
     expect(old).toContain('major_vers="3" minor_vers="3" stream_vers="4"')
     expect(old).toContain('grandma2/xml/3.3.4/MA.xsd')
   })

@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Form } from './model'
-import { tableRows } from './table'
+import { MODE_LABELS } from './table'
 import { serializeFormsXml } from './xml'
 
 const LAB_SLOT = 120
@@ -40,15 +40,21 @@ describe.runIf(process.env.MA2_HOST)('onPC lab round trip', () => {
     const file = join(dir, 'fh_integration.xml')
     writeFileSync(file, serializeFormsXml([form]))
 
-    const out = execFileSync('python3', [tool, 'import', file, String(LAB_SLOT)], {
+    const out = execFileSync('python3', [tool, 'import', file, String(LAB_SLOT), '--json'], {
       encoding: 'utf8',
       timeout: 120_000,
     })
 
-    const expected = form.graphs.flatMap((g, i) => [
-      `[${i + 1}]`,
-      ...tableRows(g).map((r) => `  ${r.x.padStart(7)} ${r.y.padStart(7)}  ${r.mode}`),
-    ])
-    expect(out.trimEnd().split('\n')).toEqual(expected)
+    // MA lists 0–100 with two decimals; compare numerically, not as strings.
+    const listed: Record<string, [number, number, string][]> = JSON.parse(out)
+    expect(Object.keys(listed)).toHaveLength(form.graphs.length)
+    form.graphs.forEach((g, i) => {
+      const rows = listed[String(i + 1)]
+      expect(rows.map((r) => r[2])).toEqual(g.points.map((p) => MODE_LABELS[p.mode]))
+      rows.forEach(([x, y], k) => {
+        expect(Math.abs(x - g.points[k].x * 100)).toBeLessThanOrEqual(0.005)
+        expect(Math.abs(y - g.points[k].y * 100)).toBeLessThanOrEqual(0.005)
+      })
+    })
   }, 180_000)
 })

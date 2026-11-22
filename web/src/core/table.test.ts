@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import builtinXml from './__fixtures__/fh_builtin_forms.xml?raw'
-import { MODE_LABELS, roundCoord, tableRows, tableText } from './table'
+import { roundCoord } from './model'
+import { MODE_LABELS, tableRows, tableText } from './table'
 import { parseFormsXml } from './xml'
 
 const forms = parseFormsXml(builtinXml)

@@ -2,8 +2,8 @@
 """Drive a grandMA2 onPC test machine from a dev box: telnet commands + file transfer.
 
 Used to verify that XML written by the web tool imports into MA exactly as intended.
-Every command that writes to the show refuses to run unless the loaded show is the
-lab show (default "form-helper-lab"), so a real showfile is never touched.
+`run` and `import` refuse to run unless the loaded show is the lab show
+(default "form-helper-lab"), so a real showfile is never touched.
 
 Configuration (environment variables):
   MA2_HOST        IP of the Windows machine running onPC        (required)
@@ -14,12 +14,13 @@ Configuration (environment variables):
   MA2_LOGIN       telnet login user / password                   (default: administrator / admin)
 
 Usage:
-  ma2lab.py run 'List Form' 'Version'           run raw commands, print output
-  ma2lab.py import file.xml 101                  upload, import at Form 101, list points back
-  ma2lab.py list 101                             list every graph's points of Form 101
+  ma2lab.py run 'List Form' 'Version'           run raw commands (lab show only), print output
+  ma2lab.py import file.xml 101 [--json]         upload, replace Form 101 with it, list points back
+  ma2lab.py list 101 [--json]                    list every graph's points of Form 101
   ma2lab.py export '1 Thru 23' name out_dir      export forms and download the XML
 """
 
+import json
 import os
 import re
 import socket
@@ -54,36 +55,57 @@ def parse_showfile(text):
     return m.group(1) if m else None
 
 
-def telnet(commands, wait=1.5):
-    """Log in, run each command, return the cleaned transcript."""
-    user, password = env("MA2_LOGIN", "administrator/admin").split("/", 1)
-    s = socket.create_connection((env("MA2_HOST"), TELNET_PORT), timeout=10)
-    s.settimeout(0.5)
-    out = b""
+PROMPT_RE = re.compile(r">\s*$")
 
-    def drain(seconds):
-        nonlocal out
-        end = time.time() + seconds
+
+class Session:
+    """One logged-in telnet session. cmd() returns that command's output."""
+
+    def __init__(self):
+        user, password = env("MA2_LOGIN", "administrator/admin").split("/", 1)
+        self.sock = socket.create_connection((env("MA2_HOST"), TELNET_PORT), timeout=10)
+        self.sock.settimeout(0.1)
+        self._read()
+        out = self.cmd(f'Login "{user}" "{password}"')
+        if "Remote commandline disabled" in out:
+            sys.exit("Telnet is disabled on the console (Setup > Console > Global Settings > Telnet)")
+
+    def _read(self, timeout=10.0, quiet=0.2):
+        """Read until the console prompt shows and the line goes quiet (timeout as a backstop)."""
+        buf = b""
+        end = time.time() + timeout
+        last = time.time()
         while time.time() < end:
             try:
-                data = s.recv(65536)
+                data = self.sock.recv(65536)
             except socket.timeout:
+                if buf and PROMPT_RE.search(clean(buf)) and time.time() - last >= quiet:
+                    break
                 continue
             if not data:
                 break
-            out += data
+            buf += data
+            last = time.time()
+        return clean(buf)
 
-    drain(1.5)
-    for cmd in [f'Login "{user}" "{password}"', *commands]:
-        s.sendall((cmd + "\r\n").encode())
-        drain(wait)
-    s.close()
-    out = re.sub(rb"\xff[\xfb-\xfe].", b"", out)
-    out = re.sub(rb"\x1b\[[0-9;]*[A-Za-z]", b"", out)
-    text = out.decode("utf-8", "replace")
-    if "Remote commandline disabled" in text:
-        sys.exit("Telnet is disabled on the console (Setup > Console > Global Settings > Telnet)")
-    return text
+    def cmd(self, command):
+        self.sock.sendall((command + "\r\n").encode())
+        return self._read()
+
+    def close(self):
+        self.sock.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+
+def clean(raw):
+    raw = re.sub(rb"\xff[\xfb-\xfe].", b"", raw)
+    raw = re.sub(rb"\x1b\[[0-9;]*[A-Za-z]", b"", raw)
+    return raw.decode("utf-8", "replace")
 
 
 def ssh_target(path):
@@ -99,59 +121,73 @@ def scp(src, dst):
     subprocess.run(["scp", "-q", "-i", key, "-o", "BatchMode=yes", src, dst], check=True)
 
 
-def require_lab_show():
-    show = parse_showfile(telnet(["Version"]))
+def require_lab_show(session):
+    show = parse_showfile(session.cmd("Version"))
     lab = env("MA2_LAB_SHOW", "form-helper-lab")
     if show != lab:
         sys.exit(f"Refusing to write: loaded show is {show!r}, expected lab show {lab!r}")
 
 
-def graph_count(form_no):
-    text = telnet([f"List Form {form_no}.*"])
-    return sum(1 for line in text.splitlines() if GRAPH_RE.match(line.strip()))
-
-
-def list_form(form_no):
+def list_form(session, form_no):
     """{graph_no: [(x, y, mode_label)]} for every graph of a Form."""
+    listing = session.cmd(f"List Form {form_no}.*")
+    count = sum(1 for line in listing.splitlines() if GRAPH_RE.match(line.strip()))
     result = {}
-    for g in range(1, graph_count(form_no) + 1):
-        text = telnet([f"cd Form {form_no}", f"cd {g}", "List", "cd /"])
-        result[g] = parse_point_list(text)
+    for g in range(1, count + 1):
+        session.cmd(f"cd Form {form_no}")
+        session.cmd(f"cd {g}")
+        result[g] = parse_point_list(session.cmd("List"))
+        session.cmd("cd /")
     return result
 
 
-def print_form(form_no):
-    for g, points in list_form(form_no).items():
+def print_form(form, as_json):
+    if as_json:
+        print(json.dumps({str(g): pts for g, pts in form.items()}))
+        return
+    for g, points in form.items():
         print(f"[{g}]")
         for x, y, mode in points:
             print(f"  {x:7.2f} {y:7.2f}  {mode}")
 
 
+# Subcommands that change the show; they only run when the lab show is loaded.
+WRITES = {"run", "import"}
+
+
 def main(argv):
-    if len(argv) < 2:
+    args = [a for a in argv[1:] if a != "--json"]
+    as_json = "--json" in argv
+    if not args:
         sys.exit(__doc__)
-    cmd, args = argv[1], argv[2:]
-    if cmd == "run":
-        print(telnet(args))
-    elif cmd == "list":
-        print_form(args[0])
-    elif cmd == "import":
-        path, form_no = args
-        require_lab_show()
-        scp(path, ssh_target(importexport_dir() + "/"))
-        name = os.path.splitext(os.path.basename(path))[0]
-        out = telnet([f'Import "{name}" At Form {form_no} /o'])
-        if "imported" not in out:
-            sys.exit(out)
-        print_form(form_no)
-    elif cmd == "export":
-        objects, name, out_dir = args
-        telnet([f'Export Form {objects} "{name}" /o'])
-        os.makedirs(out_dir, exist_ok=True)
-        scp(ssh_target(f"{importexport_dir()}/{name}.xml"), out_dir)
-        print(os.path.join(out_dir, name + ".xml"))
-    else:
-        sys.exit(__doc__)
+    cmd, args = args[0], args[1:]
+    with Session() as session:
+        if cmd in WRITES:
+            require_lab_show(session)
+        if cmd == "run":
+            for c in args:
+                print(session.cmd(c))
+        elif cmd == "list":
+            print_form(list_form(session, args[0]), as_json)
+        elif cmd == "import":
+            path, form_no = args
+            scp(path, ssh_target(importexport_dir() + "/"))
+            name = os.path.splitext(os.path.basename(path))[0]
+            # Import into an occupied slot opens an Overwrite Confirmation (even with /o),
+            # so clear the lab slot first.
+            session.cmd(f"Delete Form {form_no} /nc")
+            out = session.cmd(f'Import "{name}" At Form {form_no}')
+            if "imported" not in out:
+                sys.exit(out)
+            print_form(list_form(session, form_no), as_json)
+        elif cmd == "export":
+            objects, name, out_dir = args
+            session.cmd(f'Export Form {objects} "{name}" /o')
+            os.makedirs(out_dir, exist_ok=True)
+            scp(ssh_target(f"{importexport_dir()}/{name}.xml"), out_dir)
+            print(os.path.join(out_dir, name + ".xml"))
+        else:
+            sys.exit(__doc__)
 
 
 if __name__ == "__main__":
