@@ -1,4 +1,4 @@
-import { roundCoord, sortPoints, type Form, type Graph, type Mode, type Point } from '../core/model'
+import { roundCoord, roundTyped, sortPoints, type Form, type Graph, type Mode, type Point } from '../core/model'
 
 export interface EditorState {
   form: Form
@@ -22,7 +22,9 @@ export type Action =
   | { type: 'setPoint'; index: number; x?: number; y?: number; mode?: Mode }
   | { type: 'deletePoint'; index: number }
   | { type: 'select'; index: number | null }
-  | { type: 'beginDrag' }
+  /** Select a point and snapshot the history before dragging it. */
+  | { type: 'beginDrag'; index: number }
+  | { type: 'nudgePoint'; dx: number; dy: number }
   | { type: 'setActive'; index: number }
   | { type: 'addGraph' }
   | { type: 'deleteGraph'; index: number }
@@ -55,10 +57,6 @@ export function initialState(): History {
   return { past: [], present: { form: newForm(), active: 0, selected: null }, future: [] }
 }
 
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
-/** Values typed into the table keep MA's two decimals on the 0–100 scale. */
-const typed = (v: number) => Math.round(clamp01(v) * 10000) / 10000
-
 export function reducer(h: History, action: Action): History {
   const s = h.present
   switch (action.type) {
@@ -71,7 +69,7 @@ export function reducer(h: History, action: Action): History {
       if (h.future.length === 0) return h
       return { past: [...h.past, s], present: h.future[0], future: h.future.slice(1) }
     case 'beginDrag':
-      return { past: [...h.past, s], present: s, future: [] }
+      return { past: [...h.past, s], present: { ...s, selected: action.index }, future: [] }
     case 'select':
       return { ...h, present: { ...s, selected: action.index } }
     case 'setActive':
@@ -98,17 +96,24 @@ function edit(s: EditorState, action: Action): EditorState {
     case 'movePoint': {
       const old = graph.points[action.index]
       if (!old) return s
-      const p: Point = { ...old, x: roundCoord(clamp01(action.x)), y: roundCoord(clamp01(action.y)) }
+      const p: Point = { ...old, x: roundCoord(action.x), y: roundCoord(action.y) }
       return withPoints(s, graph.points.map((q, i) => (i === action.index ? p : q)), p)
+    }
+    case 'nudgePoint': {
+      const old = s.selected === null ? undefined : graph.points[s.selected]
+      if (!old) return s
+      const p: Point = { ...old, x: roundCoord(old.x + action.dx), y: roundCoord(old.y + action.dy) }
+      return withPoints(s, graph.points.map((q) => (q === old ? p : q)), p)
     }
     case 'setPoint': {
       const old = graph.points[action.index]
       if (!old) return s
       const p: Point = {
-        x: action.x === undefined ? old.x : typed(action.x),
-        y: action.y === undefined ? old.y : typed(action.y),
+        x: action.x === undefined ? old.x : roundTyped(action.x),
+        y: action.y === undefined ? old.y : roundTyped(action.y),
         mode: action.mode ?? old.mode,
       }
+      if (p.x === old.x && p.y === old.y && p.mode === old.mode) return s
       return withPoints(s, graph.points.map((q, i) => (i === action.index ? p : q)), p)
     }
     case 'deletePoint':

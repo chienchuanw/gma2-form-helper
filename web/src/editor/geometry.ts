@@ -40,14 +40,21 @@ export function curvePoints(graph: Graph, samples = 400): [number, number][] {
   return out
 }
 
-/** SVG path data for a graph's curve. */
+const pathCache = new WeakMap<Graph, string>()
+
+/** SVG path data for a graph's curve (cached per immutable graph object). */
 export function curvePath(graph: Graph): string {
-  return curvePoints(graph)
-    .map(([x, y], i) => {
-      const [sx, sy] = toSvg(x, y)
-      return `${i === 0 ? 'M' : 'L'}${sx.toFixed(1)},${sy.toFixed(1)}`
-    })
-    .join('')
+  let d = pathCache.get(graph)
+  if (d === undefined) {
+    d = curvePoints(graph)
+      .map(([x, y], i) => {
+        const [sx, sy] = toSvg(x, y)
+        return `${i === 0 ? 'M' : 'L'}${sx.toFixed(1)},${sy.toFixed(1)}`
+      })
+      .join('')
+    pathCache.set(graph, d)
+  }
+  return d
 }
 
 /** Index of the point closest to (sx, sy) within `radius` SVG units, or null. */
@@ -63,12 +70,4 @@ export function nearestPoint(graph: Graph, sx: number, sy: number, radius: numbe
     }
   })
   return best
-}
-
-/** `fh_<name>.xml` with only characters MA's Import accepts in a file name. */
-export function exportFileName(name: string): string {
-  const safe = name
-    .replace(/[^A-Za-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-  return `fh_${safe || 'form'}.xml`
 }

@@ -1,27 +1,19 @@
-import { useEffect, useReducer, useState, type ChangeEvent } from 'react'
-import { analyzeGraph, type GraphWarning } from './core/evaluate'
+import { useEffect, useReducer, useRef, useState, type ChangeEvent } from 'react'
+import { analyzeGraph } from './core/evaluate'
 import type { Form } from './core/model'
 import { tableText } from './core/table'
-import { DEFAULT_VERSION, parseFormsXml, serializeFormsXml } from './core/xml'
+import { DEFAULT_VERSION, exportFileName, parseFormsXml, serializeFormsXml } from './core/xml'
 import { FormPicker } from './editor/FormPicker'
 import { GraphCanvas, type SnapGrid } from './editor/GraphCanvas'
 import { GraphTabs } from './editor/GraphTabs'
+import { ModeSelect } from './editor/ModeSelect'
 import { PointTable } from './editor/PointTable'
-import { exportFileName } from './editor/geometry'
 import { initialState, reducer } from './editor/state'
 import { LangContext, STRINGS, detectLang, type Lang } from './i18n'
-import { MODES, type Mode } from './core/model'
-import { MODE_LABELS } from './core/table'
 
 /** Versions whose import has been verified on a console or onPC. */
 const VERSIONS = [DEFAULT_VERSION]
 const SNAP: SnapGrid = { x: 0.125, y: 0.1 }
-
-const WARNING_TEXT: Record<GraphWarning, 'warnSplineJump' | 'warnUnpairedBreak' | 'warnOvershoot'> = {
-  splineJump: 'warnSplineJump',
-  unpairedBreak: 'warnUnpairedBreak',
-  overshoot: 'warnOvershoot',
-}
 
 export default function App() {
   const [lang, setLang] = useState<Lang>(() => detectLang(navigator.languages ?? []))
@@ -41,32 +33,36 @@ export default function App() {
     document.documentElement.lang = lang
   }, [lang])
 
+  // Registered once; reads the current selection through a ref.
+  const selectedRef = useRef(selected)
+  useEffect(() => {
+    selectedRef.current = selected
+  }, [selected])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest('input, select, textarea')) return
+      if ((e.target as HTMLElement).closest('input, select, textarea')) return
       const mod = e.metaKey || e.ctrlKey
+      const sel = selectedRef.current
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         dispatch({ type: e.shiftKey ? 'redo' : 'undo' })
       } else if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault()
         dispatch({ type: 'redo' })
-      } else if (selected !== null && (e.key === 'Delete' || e.key === 'Backspace')) {
+      } else if (sel !== null && (e.key === 'Delete' || e.key === 'Backspace')) {
         e.preventDefault()
-        dispatch({ type: 'deletePoint', index: selected })
-      } else if (selected !== null && e.key.startsWith('Arrow')) {
+        dispatch({ type: 'deletePoint', index: sel })
+      } else if (sel !== null && e.key.startsWith('Arrow')) {
         e.preventDefault()
         const step = e.shiftKey ? 0.01 : 0.001
-        const p = graph.points[selected]
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0
         const dy = e.key === 'ArrowDown' ? -step : e.key === 'ArrowUp' ? step : 0
-        dispatch({ type: 'movePoint', index: selected, x: p.x + dx, y: p.y + dy })
+        dispatch({ type: 'nudgePoint', dx, dy })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [graph, selected])
+  }, [])
 
   const onImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -160,18 +156,12 @@ export default function App() {
             </label>
             <label className="inline">
               {t.selectedMode}
-              <select
+              <ModeSelect
+                label={t.selectedMode}
                 disabled={selected === null}
-                value={selected === null ? '' : graph.points[selected]?.mode}
-                onChange={(e) => selected !== null && dispatch({ type: 'setPoint', index: selected, mode: e.target.value as Mode })}
-              >
-                {selected === null && <option value="">—</option>}
-                {MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {MODE_LABELS[m]}
-                  </option>
-                ))}
-              </select>
+                value={selected === null ? null : (graph.points[selected]?.mode ?? null)}
+                onChange={(mode) => selected !== null && dispatch({ type: 'setPoint', index: selected, mode })}
+              />
             </label>
           </div>
           <GraphCanvas form={form} active={active} selected={selected} grid={snapOn ? SNAP : null} dispatch={dispatch} />
@@ -181,7 +171,7 @@ export default function App() {
             {analysis.approximate && <p className="notice">{t.approximate}</p>}
             {analysis.warnings.map((w) => (
               <p key={w} className="notice warn">
-                {t[WARNING_TEXT[w]]}
+                {t.warnings[w]}
               </p>
             ))}
           </div>

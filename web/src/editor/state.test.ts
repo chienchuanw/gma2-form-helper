@@ -67,8 +67,23 @@ describe('editor reducer', () => {
     expect(pts(h)).toHaveLength(3)
   })
 
+  it('nudges the selected point', () => {
+    let h = reducer(start(), { type: 'select', index: 1 })
+    h = reducer(h, { type: 'nudgePoint', dx: -0.01, dy: -0.1 })
+
+    expect(pts(h)[1]).toMatchObject({ x: 0.49, y: 0.9 })
+    expect(reducer(reducer(start(), { type: 'select', index: null }), { type: 'nudgePoint', dx: 1, dy: 0 }).past).toHaveLength(0)
+  })
+
+  it('does not record a table edit that changes nothing', () => {
+    const h = reducer(start(), { type: 'setPoint', index: 1, x: 0.5 })
+
+    expect(h.past).toHaveLength(0)
+  })
+
   it('records a whole drag as one undo step', () => {
-    let h = reducer(start(), { type: 'beginDrag' })
+    let h = reducer(start(), { type: 'beginDrag', index: 1 })
+    expect(h.present.selected).toBe(1)
     h = reducer(h, { type: 'movePoint', index: 1, x: 0.4, y: 0.9, transient: true })
     h = reducer(h, { type: 'movePoint', index: 1, x: 0.3, y: 0.8, transient: true })
     expect(pts(h)[1]).toMatchObject({ x: 0.3, y: 0.8 })

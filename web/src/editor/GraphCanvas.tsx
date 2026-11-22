@@ -43,8 +43,7 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
       dispatch({ type: 'addPoint', x, y })
       return
     }
-    dispatch({ type: 'select', index: hit })
-    dispatch({ type: 'beginDrag' })
+    dispatch({ type: 'beginDrag', index: hit })
     dragging.current = true
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }

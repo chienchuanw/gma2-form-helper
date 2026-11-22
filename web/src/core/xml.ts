@@ -95,6 +95,12 @@ export function serializeFormsXml(forms: Form[], opts: SerializeOptions = {}): s
   return lines.join('\n')
 }
 
+/** `fh_<name>.xml` with only characters MA's Import accepts in a file name. */
+export function exportFileName(name: string): string {
+  const safe = name.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '')
+  return `fh_${safe || 'form'}.xml`
+}
+
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')

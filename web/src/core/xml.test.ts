@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import builtinXml from './__fixtures__/fh_builtin_forms.xml?raw'
 import labXml from './__fixtures__/fh_lab_forms.xml?raw'
-import { parseFormsXml, serializeFormsXml } from './xml'
+import { exportFileName, parseFormsXml, serializeFormsXml } from './xml'
 
 describe('parseFormsXml', () => {
   it('reads every Form with its name and graph count', () => {
@@ -128,6 +128,13 @@ describe('serializeFormsXml', () => {
     const out = serializeFormsXml([{ name: 'A & "B" <C>', display2d: false, graphs: [] }])
 
     expect(parseFormsXml(out)[0].name).toBe('A & "B" <C>')
+  })
+})
+
+describe('exportFileName', () => {
+  it('makes an ASCII file name MA can import', () => {
+    expect(exportFileName('Rain Stair #2')).toBe('fh_Rain_Stair_2.xml')
+    expect(exportFileName('彩虹')).toBe('fh_form.xml')
   })
 })
 
