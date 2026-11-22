@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import builtinXml from './__fixtures__/fh_builtin_forms.xml?raw'
-import { parseFormsXml } from './xml'
+import labXml from './__fixtures__/fh_lab_forms.xml?raw'
+import { parseFormsXml, serializeFormsXml } from './xml'
 
 describe('parseFormsXml', () => {
   it('reads every Form with its name and graph count', () => {
@@ -77,6 +78,51 @@ describe('parseFormsXml', () => {
     expect(() => parseFormsXml(badMode)).toThrow(/wobble/)
     expect(() => parseFormsXml('<html></html>')).toThrow()
     expect(() => parseFormsXml('not xml')).toThrow()
+  })
+})
+
+describe('serializeFormsXml', () => {
+  it.each([
+    ['built-in', builtinXml],
+    ['lab', labXml],
+  ])('round-trips the %s fixture without changing any point', (_, xml) => {
+    const forms = parseFormsXml(xml)
+
+    expect(parseFormsXml(serializeFormsXml(forms))).toEqual(forms)
+  })
+
+  it('writes a 3.9.60 header by default and a chosen version on request', () => {
+    const forms = parseFormsXml(builtinXml).slice(0, 1)
+
+    expect(serializeFormsXml(forms)).toContain('major_vers="3" minor_vers="9" stream_vers="60"')
+    expect(serializeFormsXml(forms)).toContain('grandma2/xml/3.9.60/MA.xsd')
+    const old = serializeFormsXml(forms, { version: { major: 3, minor: 3, stream: 4 } })
+    expect(old).toContain('major_vers="3" minor_vers="3" stream_vers="4"')
+    expect(old).toContain('grandma2/xml/3.3.4/MA.xsd')
+  })
+
+  it('numbers Forms, graphs and points from 0 and omits zero coordinates like MA', () => {
+    const out = serializeFormsXml([
+      {
+        name: 'A',
+        display2d: false,
+        graphs: [{ color: 'ff0000', points: [{ x: 0, y: 0.5, mode: 'spline' }, { x: 0.25, y: 0, mode: 'step_end' }] }],
+      },
+      { name: 'B', display2d: true, graphs: [{ name: 'g', color: '00ff00', points: [] }] },
+    ])
+
+    expect(out).toContain('<Form index="0" name="A" display_2d="false">')
+    expect(out).toContain('<Form index="1" name="B" display_2d="true">')
+    expect(out).toContain('<SubForm index="0" display_spec_index="0" graph_color="ff0000">')
+    expect(out).toContain('<SubForm index="0" name="g" display_spec_index="0" graph_color="00ff00">')
+    expect(out).toContain('<SubFormPoint index="0" y="0.5" mode="spline" />')
+    expect(out).toContain('<SubFormPoint index="1" x="0.25" mode="step_end" />')
+  })
+
+  it('escapes special characters in names', () => {
+    const out = serializeFormsXml([{ name: 'A & "B" <C>', display2d: false, graphs: [] }])
+
+    expect(parseFormsXml(out)[0].name).toBe('A & "B" <C>')
   })
 })
 

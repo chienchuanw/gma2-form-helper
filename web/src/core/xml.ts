@@ -66,3 +66,53 @@ export function sortPoints(points: Point[]): Point[] {
 function children(el: Element, name: string): Element[] {
   return Array.from(el.children).filter((c) => c.localName === name)
 }
+
+export interface MaVersion {
+  major: number
+  minor: number
+  stream: number
+}
+
+export const DEFAULT_VERSION: MaVersion = { major: 3, minor: 9, stream: 60 }
+
+export interface SerializeOptions {
+  version?: MaVersion
+  /** Timestamp written to <Info datetime>; defaults to now. */
+  date?: Date
+}
+
+/** Write Forms as a grandMA2 export file that `Import "file" At Form N` accepts. */
+export function serializeFormsXml(forms: Form[], opts: SerializeOptions = {}): string {
+  const v = opts.version ?? DEFAULT_VERSION
+  const vs = `${v.major}.${v.minor}.${v.stream}`
+  const date = (opts.date ?? new Date()).toISOString().slice(0, 19)
+  const lines = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    `<MA xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.malighting.de/grandma2/xml/MA" xsi:schemaLocation="http://schemas.malighting.de/grandma2/xml/MA http://schemas.malighting.de/grandma2/xml/${vs}/MA.xsd" major_vers="${v.major}" minor_vers="${v.minor}" stream_vers="${v.stream}">`,
+    `\t<Info datetime="${date}" showfile="gma2-form-helper" />`,
+  ]
+  forms.forEach((form, fi) => {
+    lines.push(`\t<Form index="${fi}" name="${esc(form.name)}" display_2d="${form.display2d}">`)
+    form.graphs.forEach((g, gi) => {
+      const name = g.name === undefined ? '' : ` name="${esc(g.name)}"`
+      lines.push(`\t\t<SubForm index="${gi}"${name} display_spec_index="0" graph_color="${esc(g.color)}">`)
+      g.points.forEach((p, pi) => {
+        const x = p.x === 0 ? '' : ` x="${p.x}"`
+        const y = p.y === 0 ? '' : ` y="${p.y}"`
+        lines.push(`\t\t\t<SubFormPoint index="${pi}"${x}${y} mode="${p.mode}" />`)
+      })
+      lines.push('\t\t</SubForm>')
+    })
+    lines.push('\t</Form>')
+  })
+  lines.push('</MA>', '')
+  return lines.join('\r\n')
+}
+
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
