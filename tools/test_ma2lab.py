@@ -1,6 +1,6 @@
 import unittest
 
-from ma2lab import parse_point_list, parse_showfile
+from ma2lab import check_arg, parse_point_list, parse_showfile
 
 LIST_OUTPUT = """Forms/FH Modes 101/modes 101.1 >Executing : List
                No.  X      Y      Mode
@@ -28,6 +28,25 @@ class ParseTests(unittest.TestCase):
         text = "Console onPC 3.9.60.50\nShowfile is 'form-helper-lab'\nShowpath is 'C:/x'\n"
         self.assertEqual(parse_showfile(text), "form-helper-lab")
         self.assertIsNone(parse_showfile("nothing here"))
+
+
+class ArgumentTests(unittest.TestCase):
+    def test_accepts_plain_form_numbers_ranges_and_names(self):
+        self.assertEqual(check_arg("form", "120"), "120")
+        self.assertEqual(check_arg("objects", "1 Thru 23"), "1 Thru 23")
+        self.assertEqual(check_arg("name", "fh_builtin-forms"), "fh_builtin-forms")
+
+    def test_rejects_anything_that_could_smuggle_another_command(self):
+        for kind, value in [
+            ("form", "1; Delete Form 1"),
+            ("form", "1.2"),
+            ("objects", '1 Thru 2"; NewShow'),
+            ("name", 'x" ; Delete'),
+            ("name", "../x"),
+        ]:
+            with self.subTest(kind=kind, value=value):
+                with self.assertRaises(SystemExit):
+                    check_arg(kind, value)
 
 
 if __name__ == "__main__":

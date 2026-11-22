@@ -2,15 +2,16 @@
 """Drive a grandMA2 onPC test machine from a dev box: telnet commands + file transfer.
 
 Used to verify that XML written by the web tool imports into MA exactly as intended.
-`run` and `import` refuse to run unless the loaded show is the lab show
-(default "form-helper-lab"), so a real showfile is never touched.
+Every subcommand refuses to run unless the loaded show is the lab show
+(default "form-helper-lab"), so a real showfile is never touched; `run` re-checks
+after each command in case one of them loads another show.
 
 Configuration (environment variables):
   MA2_HOST        IP of the Windows machine running onPC        (required)
   MA2_SSH_USER    Windows account for ssh/scp                    (default: user)
   MA2_SSH_KEY     private key for ssh/scp                        (default: ~/.ssh/gma2_win)
   MA2_VERSION_DIR onPC data folder name                          (default: gma2_V_3.9.60)
-  MA2_LAB_SHOW    show name that write commands require          (default: form-helper-lab)
+  MA2_LAB_SHOW    show name every subcommand requires            (default: form-helper-lab)
   MA2_LOGIN       telnet login user / password                   (default: administrator / admin)
 
 Usage:
@@ -50,6 +51,20 @@ def parse_point_list(text):
     return points
 
 
+ARG_PATTERNS = {
+    "form": re.compile(r"[0-9]+"),
+    "objects": re.compile(r"[0-9]+( Thru [0-9]+)?"),
+    "name": re.compile(r"[A-Za-z0-9_-]+"),
+}
+
+
+def check_arg(kind, value):
+    """Arguments are pasted into MA commands, so only allow plain numbers, ranges and names."""
+    if not ARG_PATTERNS[kind].fullmatch(value):
+        sys.exit(f"Invalid {kind}: {value!r}")
+    return value
+
+
 def parse_showfile(text):
     m = re.search(r"Showfile is '([^']*)'", text)
     return m.group(1) if m else None
@@ -71,7 +86,7 @@ class Session:
             sys.exit("Telnet is disabled on the console (Setup > Console > Global Settings > Telnet)")
 
     def _read(self, timeout=10.0, quiet=0.2):
-        """Read until the console prompt shows and the line goes quiet (timeout as a backstop)."""
+        """Read until the console prompt shows and the line goes quiet. Fails loudly on timeout."""
         buf = b""
         end = time.time() + timeout
         last = time.time()
@@ -80,17 +95,17 @@ class Session:
                 data = self.sock.recv(65536)
             except socket.timeout:
                 if buf and PROMPT_RE.search(clean(buf)) and time.time() - last >= quiet:
-                    break
+                    return clean(buf)
                 continue
             if not data:
                 break
             buf += data
             last = time.time()
-        return clean(buf)
+        sys.exit(f"No console prompt within {timeout:.0f}s; partial output:\n{clean(buf)}")
 
-    def cmd(self, command):
+    def cmd(self, command, timeout=10.0):
         self.sock.sendall((command + "\r\n").encode())
-        return self._read()
+        return self._read(timeout)
 
     def close(self):
         self.sock.close()
@@ -151,10 +166,6 @@ def print_form(form, as_json):
             print(f"  {x:7.2f} {y:7.2f}  {mode}")
 
 
-# Subcommands that change the show; they only run when the lab show is loaded.
-WRITES = {"run", "import"}
-
-
 def main(argv):
     args = [a for a in argv[1:] if a != "--json"]
     as_json = "--json" in argv
@@ -162,27 +173,27 @@ def main(argv):
         sys.exit(__doc__)
     cmd, args = args[0], args[1:]
     with Session() as session:
-        if cmd in WRITES:
-            require_lab_show(session)
+        require_lab_show(session)
         if cmd == "run":
             for c in args:
-                print(session.cmd(c))
+                print(session.cmd(c, timeout=60))
+                require_lab_show(session)
         elif cmd == "list":
-            print_form(list_form(session, args[0]), as_json)
+            print_form(list_form(session, check_arg("form", args[0])), as_json)
         elif cmd == "import":
-            path, form_no = args
+            path, form_no = args[0], check_arg("form", args[1])
+            name = check_arg("name", os.path.splitext(os.path.basename(path))[0])
             scp(path, ssh_target(importexport_dir() + "/"))
-            name = os.path.splitext(os.path.basename(path))[0]
             # Import into an occupied slot opens an Overwrite Confirmation (even with /o),
             # so clear the lab slot first.
             session.cmd(f"Delete Form {form_no} /nc")
-            out = session.cmd(f'Import "{name}" At Form {form_no}')
+            out = session.cmd(f'Import "{name}" At Form {form_no}', timeout=60)
             if "imported" not in out:
                 sys.exit(out)
             print_form(list_form(session, form_no), as_json)
         elif cmd == "export":
-            objects, name, out_dir = args
-            session.cmd(f'Export Form {objects} "{name}" /o')
+            objects, name, out_dir = check_arg("objects", args[0]), check_arg("name", args[1]), args[2]
+            session.cmd(f'Export Form {objects} "{name}" /o', timeout=60)
             os.makedirs(out_dir, exist_ok=True)
             scp(ssh_target(f"{importexport_dir()}/{name}.xml"), out_dir)
             print(os.path.join(out_dir, name + ".xml"))
