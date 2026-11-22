@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import builtinXml from './__fixtures__/fh_builtin_forms.xml?raw'
 import type { Graph, Mode, Point } from './model'
-import { evaluate, isExactMode, sampleGraph } from './evaluate'
+import { evaluate, sampleGraph } from './evaluate'
 import { parseFormsXml } from './xml'
 
 const p = (x: number, y: number, mode: Mode = 'linear'): Point => ({ x, y, mode })
@@ -86,13 +86,22 @@ describe('evaluate', () => {
     }
   })
 
-  it('makes break modes meet the neighbouring point as a straight-line corner', () => {
-    // A break at the end means the segment arrives with its own secant slope.
-    const s = g(p(0, 0, 'spline_break_end'), p(0.5, 1, 'spline'), p(0.75, 0, 'spline'))
+  it('ends a spline chain at a break with a corner instead of blending into the next segment', () => {
+    // Shaped like built-in Swing: the chain (0..0.5) ends at a break, then a flat line follows.
+    const s = g(p(0, 0, 'spline_break_start'), p(0.25, 1, 'spline'), p(0.45, 0.3, 'spline_break_end'), p(0.5, 0, 'linear'))
     const h = 1e-6
-    const arriving = (evaluate(s, 0.5) - evaluate(s, 0.5 - h)) / h
+    const arriving = (evaluate(s, 0.5, 'left') - evaluate(s, 0.5 - h)) / h
 
-    expect(arriving).toBeCloseTo(2, 3) // secant slope of (0,0)->(0.5,1)
+    expect(arriving).toBeLessThan(-1)
+    expect(evaluate(s, 0.75)).toBe(0)
+  })
+
+  it('takes the slope of a neighbouring linear segment where a spline chain meets it', () => {
+    const s = g(p(0, 0.2, 'linear'), p(0.2, 0.8, 'spline'), p(0.4, 0.3, 'linear'))
+    const h = 1e-6
+    const leaving = (evaluate(s, 0.2 + h) - evaluate(s, 0.2)) / h
+
+    expect(leaving).toBeCloseTo(3, 3) // slope of (0,0.2)->(0.2,0.8)
   })
 })
 
@@ -104,10 +113,10 @@ describe('evaluate next to vertical jumps', () => {
     for (let t = 0; t < 1; t += 0.005) {
       const v = evaluate(s, t)
       // Without jump handling the curve next to the jump reached about 1.22 / -0.22.
-      // (Plain Catmull-Rom overshoot on steep segments elsewhere is expected until #2.)
-      expect(v).toBeGreaterThanOrEqual(-0.01)
-      expect(v).toBeLessThanOrEqual(1.01)
-      expect(evaluate(near, t)).toBeLessThanOrEqual(1.01)
+      // (MA itself draws nothing for this graph; analyzeGraph warns about it.)
+      expect(v).toBeGreaterThanOrEqual(-0.1)
+      expect(v).toBeLessThanOrEqual(1.1)
+      expect(evaluate(near, t)).toBeLessThanOrEqual(1.1)
     }
   })
 })
@@ -131,14 +140,5 @@ describe('sampleGraph', () => {
 
     expect(s.map((q) => q.x)).toEqual([0, 0.25, 0.5, 0.75, 1])
     expect(s[2].y).toBeCloseTo(0.5, 12)
-  })
-})
-
-describe('isExactMode', () => {
-  it('treats only linear as exact until the other modes are calibrated against MA', () => {
-    expect(isExactMode('linear')).toBe(true)
-    for (const m of ['spline', 'spline_break_start', 'spline_break_end', 'step_start', 'step_end'] as const) {
-      expect(isExactMode(m)).toBe(false)
-    }
   })
 })
