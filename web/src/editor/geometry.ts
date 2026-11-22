@@ -10,8 +10,14 @@ export function toSvg(x: number, y: number): [number, number] {
   return [PLOT.left + x * PLOT.width, PLOT.top + (1 - y) * PLOT.height]
 }
 
+/** Graph coordinates of an SVG position, not clamped (a stroke may run past the plot). */
+export function toGraph(sx: number, sy: number): [number, number] {
+  return [(sx - PLOT.left) / PLOT.width, 1 - (sy - PLOT.top) / PLOT.height]
+}
+
 export function fromSvg(sx: number, sy: number): [number, number] {
-  return [clamp01((sx - PLOT.left) / PLOT.width), clamp01(1 - (sy - PLOT.top) / PLOT.height)]
+  const [x, y] = toGraph(sx, sy)
+  return [clamp01(x), clamp01(y)]
 }
 
 /**

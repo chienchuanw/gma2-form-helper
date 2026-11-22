@@ -44,15 +44,16 @@ export function fitStroke(samples: readonly Sample[], opts: FitOptions): Point[]
 
   // Key point indices into each piece's resampled stroke. RDP is a straight-line
   // simplifier, so seed coarsely and let the curve refinement add what it needs.
+  const grid = opts.grid ?? null
   const keys = pieces.map((p) => rdp(p, 0, p.length - 1, tol * 4))
-  let points = build(pieces, keys, tol)
+  let points = build(pieces, keys, tol, grid)
   for (let round = 0; round < MAX_REFINE; round++) {
     const worst = worstSample(pieces, keys, points, tol)
     if (!worst) break
     keys[worst.piece] = [...keys[worst.piece], worst.index].sort((a, b) => a - b)
-    points = build(pieces, keys, tol)
+    points = build(pieces, keys, tol, grid)
   }
-  return opts.grid ? snapPoints(points, opts.grid) : points
+  return drawable(points)
 }
 
 /** The x range a stroke covers once backtracking is dropped, or null if it is too short to fit. */
@@ -61,11 +62,27 @@ export function strokeSpan(samples: readonly Sample[]): { from: number; to: numb
   return m.length ? { from: m[0].x, to: m[m.length - 1].x } : null
 }
 
-/** Drop backtracking so x never decreases; clamp into the unit square. */
+/**
+ * Keep the stroke inside 0–1 in x (cutting it exactly at an edge it crosses, so
+ * drawing past the end does not pile points onto x = 0 or 1), drop non-numbers
+ * and backtracking so x never decreases, and clamp y.
+ */
 function monotonic(samples: readonly Sample[]): Sample[] {
+  const finite = samples.filter((s) => Number.isFinite(s.x) && Number.isFinite(s.y))
+  const inside: Sample[] = []
+  finite.forEach((q, i) => {
+    const p = finite[i - 1]
+    if (p) {
+      const [lo, hi] = p.x < q.x ? [p, q] : [q, p]
+      for (const edge of [0, 1]) {
+        if ((p.x - edge) * (q.x - edge) < 0) inside.push({ x: edge, y: lerpY(lo, hi, edge) })
+      }
+    }
+    if (q.x >= 0 && q.x <= 1) inside.push(q)
+  })
   const out: Sample[] = []
-  for (const s of samples) {
-    const p = { x: clamp01(s.x), y: clamp01(s.y) }
+  for (const s of inside) {
+    const p = { x: s.x, y: clamp01(s.y) }
     if (out.length === 0 || p.x >= out[out.length - 1].x) out.push(p)
   }
   if (out.length < 2 || out[out.length - 1].x - out[0].x < MIN_SPAN) return []
@@ -174,8 +191,10 @@ interface Seg {
   step?: boolean
 }
 
-/** Points with modes from the key indices of every piece. */
-function build(pieces: Sample[][], keys: number[][], tol: number): Point[] {
+/** Points with modes from the key indices of every piece, snapped to the grid if given. */
+function build(pieces: Sample[][], keys: number[][], tol: number, grid: { x: number; y: number } | null): Point[] {
+  const sx = (x: number) => roundCoord(grid ? snap(x, grid.x) : x)
+  const sy = (y: number) => roundCoord(grid ? snap(y, grid.y) : y)
   const segs: Seg[] = []
   pieces.forEach((s, pi) => {
     const ks = keys[pi]
@@ -184,12 +203,19 @@ function build(pieces: Sample[][], keys: number[][], tol: number): Point[] {
       const curved = next !== undefined && farthest(s, k, next)[1] > tol / 2
       const jump = next === undefined && pi < pieces.length - 1
       // The top of a jump sits at the jump's x, so both sides share it exactly.
-      const x = jump ? pieces[pi + 1][0].x : s[k].x
+      const x = sx(jump ? pieces[pi + 1][0].x : s[k].x)
+      const y = sy(s[k].y)
       const prev = segs[segs.length - 1]
-      if (prev && prev.x === roundCoord(x) && prev.y === roundCoord(s[k].y)) segs.pop() // same point twice
+      // Two points on one x are only allowed as the two sides of a drawn jump;
+      // anything else (e.g. snapped onto the same grid line) would be an
+      // accidental jump, so the later point gives way.
+      if (prev && prev.x === x && (prev.y === y || !prev.jump)) {
+        if (jump) prev.jump = true
+        return
+      }
       segs.push({
-        x: roundCoord(x),
-        y: roundCoord(s[k].y),
+        x,
+        y,
         curved,
         corner: n > 0 && next !== undefined && turn(s, k) > CORNER,
         jump,
@@ -262,20 +288,21 @@ function worstSample(pieces: Sample[][], keys: number[][], points: Point[], tol:
 }
 
 /**
- * Snap to the grid. Points that land on the same grid line as the previous one
- * are dropped (they would become an accidental vertical jump), except the two
- * sides of a jump that was actually drawn, which already shared their x.
+ * Last line of defence for MA: no spline segment of zero width (MA draws
+ * nothing) and, in an all-spline graph, breaks that pair up (MA draws garbage).
  */
-function snapPoints(points: Point[], grid: { x: number; y: number }): Point[] {
-  const out: Point[] = []
-  let prevX: number | null = null
-  for (const p of points) {
-    const q = { ...p, x: roundCoord(snap(p.x, grid.x)), y: roundCoord(snap(p.y, grid.y)) }
-    const prev = out[out.length - 1]
-    const drawnJump = prevX !== null && p.x === prevX
-    if (prev && prev.x === q.x && (!drawnJump || prev.y === q.y)) continue
-    out.push(q)
-    prevX = p.x
+function drawable(points: Point[]): Point[] {
+  const n = points.length
+  if (n < 2) return points
+  const out = points.map((p, i) => {
+    const next = points[(i + 1) % n]
+    const width = next.x + (i === n - 1 ? 1 : 0) - p.x
+    return width <= 0.002 && p.mode.startsWith('spline') ? { ...p, mode: 'linear' as Mode } : p
+  })
+  const breaks = out.filter((p) => p.mode === 'spline_break_start' || p.mode === 'spline_break_end').map((p) => p.mode)
+  const paired = breaks.every((m, i) => m !== breaks[(i + 1) % breaks.length])
+  if (out.every((p) => p.mode.startsWith('spline')) && !paired) {
+    return out.map((p) => (p.mode === 'spline' ? p : { ...p, mode: 'spline' as Mode }))
   }
   return out
 }

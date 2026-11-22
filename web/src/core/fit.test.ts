@@ -116,6 +116,46 @@ describe('fitStroke', () => {
     expect(evaluate({ color: '', points: pts }, 0.75)).toBeCloseTo(0.9, 1)
   })
 
+  it('never produces a graph MA cannot draw, with or without snapping (fuzz)', () => {
+    let seed = 42
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    for (let n = 0; n < 200; n++) {
+      const a = rnd(), b = rnd() * 6, c = rnd(), from = rnd() * 0.3, to = 0.7 + rnd() * 0.3
+      const f = (x: number) => 0.5 + 0.4 * a * Math.sin(b * Math.PI * x + c) + (rnd() < 0.05 ? 0.3 : 0)
+      const s = stroke(f, from, to, 150, 0.01)
+      for (const grid of [null, { x: 0.125, y: 0.1 }]) {
+        for (const tol of [precisionToTolerance(1), precisionToTolerance(10)]) {
+          const pts = fitStroke(s, { tolerance: tol, grid })
+          const w = analyzeGraph({ color: '', points: pts }).warnings
+          expect(w.filter((x) => x !== 'overshoot')).toEqual([])
+          expect(pts.map((p) => p.x)).toEqual([...pts.map((p) => p.x)].sort((p, q) => p - q))
+        }
+      }
+    }
+  })
+
+  it('closes a full-cycle sine cleanly at the highest precision with snapping', () => {
+    const pts = fitStroke(stroke((x) => 0.5 + 0.45 * Math.sin(2 * Math.PI * x)), { tolerance: precisionToTolerance(10), grid: { x: 0.125, y: 0.1 } })
+
+    expect(analyzeGraph({ color: '', points: pts }).warnings).toEqual([])
+  })
+
+  it('cuts a stroke drawn past the edges at exactly 0 and 100', () => {
+    const s = stroke((x) => 0.3 + 0.2 * x, -0.1, 1.1, 300)
+    const pts = fitStroke(s, { tolerance: 0.02 })
+
+    expect(pts.filter((p) => p.x === 0).length).toBeLessThanOrEqual(1)
+    expect(pts.filter((p) => p.x === 1).length).toBeLessThanOrEqual(1)
+    expect(pts[0].x).toBe(0)
+    expect(pts[0].y).toBeCloseTo(0.3, 1)
+  })
+
+  it('ignores samples that are not numbers', () => {
+    const s = [...stroke((x) => x, 0, 0.5, 50), { x: NaN, y: 0.5 }, { x: 0.7, y: Infinity }, ...stroke((x) => x, 0.5, 1, 50)]
+
+    expect(fitStroke(s, { tolerance: 0.02 }).every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))).toBe(true)
+  })
+
   it('returns nothing for a stroke too short to fit', () => {
     expect(fitStroke([{ x: 0.5, y: 0.5 }], { tolerance: 0.02 })).toEqual([])
   })

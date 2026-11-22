@@ -174,7 +174,10 @@ function edit(s: EditorState, action: Action): EditorState {
       return withPoints(s, graph.points.map((q, i) => (i === action.index ? p : q)), p)
     }
     case 'drawStroke': {
-      const kept = graph.points.filter((p) => p.x < action.from - 1e-9 || p.x > action.to + 1e-9)
+      // Cover where the fitted points actually landed too (snapping can move them past the stroke).
+      const from = Math.min(action.from, ...action.points.map((p) => p.x))
+      const to = Math.max(action.to, ...action.points.map((p) => p.x))
+      const kept = graph.points.filter((p) => p.x < from - 1e-9 || p.x > to + 1e-9)
       const points = sortPoints([...kept, ...action.points])
       return { ...withGraph(s, s.active, { ...graph, points }), selected: null }
     }

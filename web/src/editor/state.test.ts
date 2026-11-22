@@ -171,6 +171,13 @@ describe('editor reducer', () => {
     expect(pts(h).map((p) => p.x)).toEqual([0, 0.5, 0.9])
   })
 
+  it('also replaces old points where snapped stroke points landed just outside the span', () => {
+    let h = reducer(start(), { type: 'addPoint', x: 0.62, y: 0.3 })
+    h = reducer(h, { type: 'drawStroke', stroke: 2, from: 0.2, to: 0.6, points: [{ x: 0.25, y: 0.1, mode: 'linear' }, { x: 0.625, y: 0.7, mode: 'linear' }] })
+
+    expect(pts(h).map((p) => p.x)).toEqual([0, 0.25, 0.625])
+  })
+
   it('re-fits the same stroke in place without a new undo step', () => {
     const fit = (y: number) => ({ type: 'drawStroke' as const, stroke: 7, from: 0.2, to: 0.6, points: [{ x: 0.3, y, mode: 'spline' as const }] })
     let h = reducer(start(), fit(0.1))
