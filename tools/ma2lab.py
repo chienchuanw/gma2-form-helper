@@ -140,7 +140,7 @@ def require_lab_show(session):
     show = parse_showfile(session.cmd("Version"))
     lab = env("MA2_LAB_SHOW", "form-helper-lab")
     if show != lab:
-        sys.exit(f"Refusing to write: loaded show is {show!r}, expected lab show {lab!r}")
+        sys.exit(f"Refusing to run: loaded show is {show!r}, expected lab show {lab!r}")
 
 
 def list_form(session, form_no):
@@ -172,6 +172,8 @@ def main(argv):
     if not args:
         sys.exit(__doc__)
     cmd, args = args[0], args[1:]
+    if (cmd, len(args)) not in {("list", 1), ("import", 2), ("export", 3)} and not (cmd == "run" and args):
+        sys.exit(__doc__)
     with Session() as session:
         require_lab_show(session)
         if cmd == "run":
