@@ -1,0 +1,254 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<MA xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.malighting.de/grandma2/xml/MA" xsi:schemaLocation="http://schemas.malighting.de/grandma2/xml/MA http://schemas.malighting.de/grandma2/xml/3.9.60/MA.xsd" major_vers="3" minor_vers="9" stream_vers="60">
+	<Info datetime="2026-11-22T21:01:04" showfile="form-helper-lab" />
+	<Form index="0" name="Stomp" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="1" name="Release" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="2" name="Random" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+			<SubFormPoint index="1" x="0.16666667" y="1" mode="linear" />
+			<SubFormPoint index="2" x="0.5" y="1" mode="linear" />
+			<SubFormPoint index="3" x="0.66666669" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="3" name="Pwm" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+			<SubFormPoint index="1" x="0.16666667" y="1" mode="linear" />
+			<SubFormPoint index="2" x="0.5" y="1" mode="linear" />
+			<SubFormPoint index="3" x="0.66666669" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="4" name="Chase" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+			<SubFormPoint index="1" x="0.16666667" y="1" mode="linear" />
+			<SubFormPoint index="2" x="0.5" y="1" mode="linear" />
+			<SubFormPoint index="3" x="0.66666669" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="5" name="Flat Low" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="6" name="Flat High" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" y="1" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="7" name="Sin" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" y="0.5" mode="spline" />
+			<SubFormPoint index="1" x="0.125" y="0.85355341" mode="spline" />
+			<SubFormPoint index="2" x="0.25" y="1" mode="spline" />
+			<SubFormPoint index="3" x="0.375" y="0.85355341" mode="spline" />
+			<SubFormPoint index="4" x="0.5" y="0.49999997" mode="spline" />
+			<SubFormPoint index="5" x="0.625" y="0.14644656" mode="spline" />
+			<SubFormPoint index="6" x="0.75" mode="spline" />
+			<SubFormPoint index="7" x="0.875" y="0.14644673" mode="spline" />
+		</SubForm>
+	</Form>
+	<Form index="8" name="Cos" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" y="1" mode="spline" />
+			<SubFormPoint index="1" x="0.125" y="0.85355341" mode="spline" />
+			<SubFormPoint index="2" x="0.25" y="0.49999997" mode="spline" />
+			<SubFormPoint index="3" x="0.375" y="0.14644662" mode="spline" />
+			<SubFormPoint index="4" x="0.5" mode="spline" />
+			<SubFormPoint index="5" x="0.625" y="0.14644668" mode="spline" />
+			<SubFormPoint index="6" x="0.75" y="0.5" mode="spline" />
+			<SubFormPoint index="7" x="0.875" y="0.85355353" mode="spline" />
+		</SubForm>
+	</Form>
+	<Form index="9" name="Ramp Plus" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+			<SubFormPoint index="1" x="1" y="1" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="10" name="Ramp Minus" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" y="1" mode="linear" />
+			<SubFormPoint index="1" x="1" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="11" name="Ramp" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+			<SubFormPoint index="1" x="0.5" y="1" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="12" name="Phase 1" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" x="0.16666667" mode="linear" />
+			<SubFormPoint index="1" x="0.33333334" y="1" mode="linear" />
+			<SubFormPoint index="2" x="0.66666669" y="1" mode="linear" />
+			<SubFormPoint index="3" x="0.83333331" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="13" name="Phase 2" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" y="1" mode="linear" />
+			<SubFormPoint index="1" x="0.16666667" mode="linear" />
+			<SubFormPoint index="2" x="0.5" mode="linear" />
+			<SubFormPoint index="3" x="0.66666669" y="1" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="14" name="Phase 3" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" x="0.33333334" y="1" mode="linear" />
+			<SubFormPoint index="1" x="0.5" mode="linear" />
+			<SubFormPoint index="2" x="0.83333331" mode="linear" />
+			<SubFormPoint index="3" x="1" y="1" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="15" name="Bump" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="spline_break_start" />
+			<SubFormPoint index="1" x="0.1" y="0.309017" mode="spline" />
+			<SubFormPoint index="2" x="0.30000001" y="0.809017" mode="spline" />
+			<SubFormPoint index="3" x="0.40000001" y="0.95105654" mode="spline" />
+			<SubFormPoint index="4" x="0.5" y="1" mode="spline" />
+			<SubFormPoint index="5" x="0.60000002" y="0.95105648" mode="spline" />
+			<SubFormPoint index="6" x="0.69999999" y="0.80901694" mode="spline" />
+			<SubFormPoint index="7" x="0.89999998" y="0.30901691" mode="spline_break_end" />
+		</SubForm>
+	</Form>
+	<Form index="16" name="Swing" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="spline_break_start" />
+			<SubFormPoint index="1" x="0.050000001" y="0.309017" mode="spline" />
+			<SubFormPoint index="2" x="0.15000001" y="0.809017" mode="spline" />
+			<SubFormPoint index="3" x="0.25" y="1" mode="spline" />
+			<SubFormPoint index="4" x="0.34999999" y="0.80901694" mode="spline" />
+			<SubFormPoint index="5" x="0.44999999" y="0.30901691" mode="spline_break_end" />
+			<SubFormPoint index="6" x="0.5" y="-8.7422777e-08" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="17" name="Ramp 50" display_2d="false">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+			<SubFormPoint index="1" x="0.25" y="1" mode="linear" />
+			<SubFormPoint index="2" x="0.5" y="1" mode="linear" />
+			<SubFormPoint index="3" x="0.75" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="18" name="Circle" display_2d="true">
+		<SubForm index="0" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" y="0.5" mode="spline" />
+			<SubFormPoint index="1" x="0.125" y="0.85355341" mode="spline" />
+			<SubFormPoint index="2" x="0.25" y="1" mode="spline" />
+			<SubFormPoint index="3" x="0.375" y="0.85355341" mode="spline" />
+			<SubFormPoint index="4" x="0.5" y="0.49999997" mode="spline" />
+			<SubFormPoint index="5" x="0.625" y="0.14644656" mode="spline" />
+			<SubFormPoint index="6" x="0.75" mode="spline" />
+			<SubFormPoint index="7" x="0.875" y="0.14644673" mode="spline" />
+		</SubForm>
+		<SubForm index="1" display_spec_index="0" graph_color="30c0c0">
+			<SubFormPoint index="0" y="1" mode="spline" />
+			<SubFormPoint index="1" x="0.125" y="0.85355341" mode="spline" />
+			<SubFormPoint index="2" x="0.25" y="0.49999997" mode="spline" />
+			<SubFormPoint index="3" x="0.375" y="0.14644662" mode="spline" />
+			<SubFormPoint index="4" x="0.5" mode="spline" />
+			<SubFormPoint index="5" x="0.625" y="0.14644668" mode="spline" />
+			<SubFormPoint index="6" x="0.75" y="0.5" mode="spline" />
+			<SubFormPoint index="7" x="0.875" y="0.85355353" mode="spline" />
+		</SubForm>
+	</Form>
+	<Form index="19" name="Sound" display_2d="false">
+		<SubForm index="0" name="SndAll" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="1" name="SndBass" display_spec_index="0" graph_color="30c0c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="2" name="SndMed" display_spec_index="0" graph_color="c030c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="3" name="SndHigh" display_spec_index="0" graph_color="c0c030">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="4" name="Snd1" display_spec_index="0" graph_color="c03030">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="5" name="Snd2" display_spec_index="0" graph_color="30c030">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="6" name="Snd3" display_spec_index="0" graph_color="3030c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="7" name="Snd4" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="8" name="Snd5" display_spec_index="0" graph_color="30c0c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="9" name="Snd6" display_spec_index="0" graph_color="c030c0">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+		<SubForm index="10" name="Snd7" display_spec_index="0" graph_color="c0c030">
+			<SubFormPoint index="0" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="20" name="Flyout" display_2d="false">
+		<SubForm index="0" name="dimmer" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" x="0.19954337" mode="linear" />
+			<SubFormPoint index="1" x="0.29954299" y="1" mode="linear" />
+			<SubFormPoint index="2" x="0.95045626" y="1" mode="linear" />
+			<SubFormPoint index="3" x="1" mode="linear" />
+		</SubForm>
+		<SubForm index="1" name="Position" display_spec_index="0" graph_color="30c0c0">
+			<SubFormPoint index="0" mode="linear" />
+			<SubFormPoint index="1" x="1" y="1" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="21" name="Wave" display_2d="true">
+		<SubForm index="0" name="Wave" display_spec_index="0" graph_color="00e8ff">
+			<SubFormPoint index="0" y="0.27134436" mode="spline" />
+			<SubFormPoint index="1" x="0.125" y="0.32205749" mode="spline" />
+			<SubFormPoint index="2" x="0.25" y="0.50233001" mode="spline" />
+			<SubFormPoint index="3" x="0.375" y="0.69774848" mode="spline" />
+			<SubFormPoint index="4" x="0.5" y="0.73533863" mode="spline" />
+			<SubFormPoint index="5" x="0.625" y="0.6726619" mode="spline" />
+			<SubFormPoint index="6" x="0.75" y="0.50465989" mode="spline" />
+			<SubFormPoint index="7" x="0.875" y="0.31623161" mode="spline" />
+		</SubForm>
+		<SubForm index="1" name="Wave" display_spec_index="0" graph_color="30c0c0">
+			<SubFormPoint index="0" y="0.53786385" mode="spline" />
+			<SubFormPoint index="1" x="0.125" y="0.74815398" mode="spline" />
+			<SubFormPoint index="2" x="0.25" y="0.56904674" mode="spline" />
+			<SubFormPoint index="3" x="0.375" y="0.75164914" mode="spline" />
+			<SubFormPoint index="4" x="0.5" y="0.53875548" mode="spline" />
+			<SubFormPoint index="5" x="0.625" y="0.34176993" mode="spline" />
+			<SubFormPoint index="6" x="0.75" y="0.51661909" mode="spline" />
+			<SubFormPoint index="7" x="0.875" y="0.33168656" mode="spline" />
+		</SubForm>
+	</Form>
+	<Form index="22" name="Cross" display_2d="true">
+		<SubForm index="0" name="Cross" display_spec_index="0" graph_color="00e8ff">
+			<SubFormPoint index="0" x="0.125" y="0.71900344" mode="linear" />
+			<SubFormPoint index="1" x="0.375" y="0.71900296" mode="linear" />
+			<SubFormPoint index="2" x="0.5" y="0.49999994" mode="linear" />
+			<SubFormPoint index="3" x="0.75" y="0.26189148" mode="linear" />
+			<SubFormPoint index="4" x="0.875" y="0.26189116" mode="linear" />
+			<SubFormPoint index="5" x="0.0023148148" y="0.49999994" mode="linear" />
+		</SubForm>
+		<SubForm index="1" name="Cross" display_spec_index="0" graph_color="30c0c0">
+			<SubFormPoint index="0" x="0.125" y="0.67458117" mode="linear" />
+			<SubFormPoint index="1" x="0.375" y="0.32541952" mode="linear" />
+			<SubFormPoint index="2" x="0.5" y="0.67458081" mode="linear" />
+			<SubFormPoint index="3" x="0.75" y="0.32541955" mode="linear" />
+			<SubFormPoint index="4" x="0.875" y="0.67458057" mode="linear" />
+			<SubFormPoint index="5" x="0.0023148148" y="0.32541919" mode="linear" />
+		</SubForm>
+	</Form>
+</MA>
