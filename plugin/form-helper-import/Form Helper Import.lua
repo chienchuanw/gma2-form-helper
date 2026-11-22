@@ -8,9 +8,12 @@
 --
 -- What the console taught us (onPC 3.9.60):
 --   * Import needs the ".xml" extension when the file name has a space.
---   * Import into an occupied slot opens an Overwrite Confirmation, which a
---     plugin cannot answer; "/nc" replaces silently. So this plugin asks first
---     and then imports with /nc.
+--   * Import into an occupied slot opens MA's Overwrite Confirmation on screen
+--     (also when a plugin runs the command; the plugin waits for the answer).
+--     "/nc" replaces silently instead. So: when the file can be read, the plugin
+--     shows every slot it will fill, asks, and imports with /nc; when it cannot
+--     (USB), it imports without /nc and MA asks.
+--   * A file with several Forms fills consecutive slots from the target on.
 --   * gma.show.getobj.handle("Form N") is nil for an empty slot.
 --   * gma.show.getvar("PATH") is the data folder; files live in its importexport.
 --
@@ -38,10 +41,10 @@ function M.xml_name(input)
     return name
 end
 
--- /nc: the plugin has already asked about overwriting, and MA's own dialog
--- cannot be answered from a plugin.
-function M.import_cmd(file, slot)
-    return string.format('Import "%s" At Form %d /nc', file, slot)
+-- confirmed: the plugin has asked about every slot the file fills, so /nc keeps
+-- MA from asking again. Otherwise MA's own Overwrite Confirmation asks.
+function M.import_cmd(file, slot, confirmed)
+    return string.format('Import "%s" At Form %d%s', file, slot, confirmed and " /nc" or "")
 end
 
 function M.parse_slot(input)
@@ -67,12 +70,25 @@ local function unescape(s)
 end
 
 -- Forms in an MA export file, as { name, graphs } for the confirmation text.
+-- Handles both <Form ...>...</Form> and self-closing <Form ... />.
 function M.parse_forms(text)
     local out = {}
     if type(text) ~= "string" or not string.find(text, "<MA[%s>]") then return out end
-    for attrs, body in string.gmatch(text, "<Form(%s[^>]*)>(.-)</Form>") do
-        local _, graphs = string.gsub(body, "<SubForm[%s>/]", "")
-        out[#out + 1] = { name = unescape(string.match(attrs, 'name="([^"]*)"') or ""), graphs = graphs }
+    local pos = 1
+    while true do
+        local s, e, attrs = string.find(text, "<Form(%s[^>]*)>", pos)
+        if not s then break end
+        local name = unescape(string.match(attrs, 'name="([^"]*)"') or "")
+        local graphs = 0
+        pos = e + 1
+        if string.sub(attrs, -1) ~= "/" then
+            local close = string.find(text, "</Form>", pos, true)
+            local body = string.sub(text, pos, (close or (#text + 1)) - 1)
+            local _, n = string.gsub(body, "<SubForm[%s>/]", "")
+            graphs = n
+            pos = close and (close + 7) or (#text + 1)
+        end
+        out[#out + 1] = { name = name, graphs = graphs }
     end
     return out
 end
@@ -99,6 +115,15 @@ function M.list_cmd(dir, os_name)
         return string.format('dir /b /o-d "%s\\fh_*.xml" 2>nul', (string.gsub(dir, "/", "\\")))
     end
     return string.format('ls -t "%s"/fh_*.xml 2>/dev/null', dir)
+end
+
+-- Did the import land? before/after are { handle, name } of the target slot
+-- (nil when empty); expected is the first Form's name in the file, if known.
+function M.imported(before, after, expected)
+    if not after then return false end
+    if expected then return after.name == expected and (not before or after.handle ~= before.handle or before.name == expected) end
+    if not before then return true end
+    return after.handle ~= before.handle or after.name ~= before.name
 end
 
 -- getobj.name answers "Flyout 123": the label with the pool number appended.
@@ -158,6 +183,17 @@ local function describe(forms)
     return table.concat(lines, "\n")
 end
 
+local function slot_info(n)
+    local h = form_handle(n)
+    if not h then return nil end
+    return { handle = h, name = M.strip_number(call1(O.name, h), n) }
+end
+
+-- Ask for text; nil means the user cancelled.
+local function ask(title, default)
+    return call1(gma.textinput, title, default)
+end
+
 function Start()
     gma.echo("")
     note("start")
@@ -165,10 +201,10 @@ function Start()
     local os_name = call1(gma.show.getvar, "OS") or ""
     local dir = base and (base .. "/importexport") or nil
 
-    -- 1. Which drive. The internal drive can be checked before importing; a USB
-    --    stick appears as another drive number (see the SelectDrive list).
-    local drive_in = call1(gma.textinput, "Drive (1 = internal)", "1")
-    if drive_in == nil then return end
+    -- 1. Which drive. Only the internal drive can be read before importing; a
+    --    USB stick appears as another drive number (see the SelectDrive list).
+    local drive_in = ask("Drive (1 = internal)", "1")
+    if drive_in == nil then return note("cancelled") end
     local drive = M.parse_slot(drive_in)
     if not drive then
         return fail("Not a drive number: " .. tostring(drive_in) ..
@@ -178,8 +214,10 @@ function Start()
 
     -- 2. Which file. Default: the newest fh_*.xml in the internal importexport.
     local default = (internal and dir and newest_file(dir, os_name)) or "fh_"
-    local file = M.xml_name(call1(gma.textinput, "Form file (importexport)", default))
-    if not file then return note("cancelled") end
+    local file_in = ask("Form file (importexport)", default)
+    if file_in == nil then return note("cancelled") end
+    local file = M.xml_name(file_in)
+    if not file then return fail("Not a usable file name: " .. tostring(file_in)) end
 
     local forms
     if internal and dir then
@@ -194,36 +232,43 @@ function Start()
 
     -- 3. Which slot. Default: the first empty one.
     local suggestion = M.first_empty(function(n) return form_handle(n) ~= nil end, 1, MAX_FORM)
-    local slot = M.parse_slot(call1(gma.textinput, "Import into Form", tostring(suggestion or "")))
-    if not slot then return note("cancelled") end
+    local slot_in = ask("Import into Form", tostring(suggestion or ""))
+    if slot_in == nil then return note("cancelled") end
+    local slot = M.parse_slot(slot_in)
+    if not slot then return fail("Not a Form number: " .. tostring(slot_in)) end
 
-    -- 4. Never replace a Form without asking.
-    local count = forms and #forms or 1
-    local occupied = {}
-    for n = slot, slot + count - 1 do
-        local h = form_handle(n)
-        if h then occupied[#occupied + 1] = string.format("  Form %d: %s", n, M.strip_number(call1(O.name, h), n)) end
-    end
-    local question = string.format("Import %s into Form %d?", file, slot)
-    if forms then question = question .. "\n\n" .. describe(forms) end
-    if #occupied > 0 then
-        question = question .. "\n\nThis REPLACES:\n" .. table.concat(occupied, "\n")
+    -- 4. Never replace a Form without asking. With a readable file the plugin
+    --    asks about every slot it fills; otherwise MA's own dialog asks.
+    local question
+    if forms then
+        local occupied = {}
+        for n = slot, slot + #forms - 1 do
+            local info = slot_info(n)
+            if info then occupied[#occupied + 1] = string.format("  Form %d: %s", n, info.name) end
+        end
+        question = string.format("Import %s into Form %d%s?\n\n%s", file, slot,
+            #forms > 1 and string.format("-%d", slot + #forms - 1) or "", describe(forms))
+        if #occupied > 0 then question = question .. "\n\nThis REPLACES:\n" .. table.concat(occupied, "\n") end
+    else
+        question = string.format("Import %s from drive %d into Form %d?\n\n" ..
+            "The file cannot be previewed on this drive. If it would replace\nexisting Forms, MA asks before doing so.", file, drive, slot)
     end
     if not call1(gma.gui.confirm, PLUGIN_TITLE, question) then return note("cancelled") end
 
-    -- 5. Import and check that it arrived.
+    -- 5. Import and check that it really arrived.
+    local before = slot_info(slot)
     gma.cmd("SelectDrive " .. drive)
-    local cmd = M.import_cmd(file, slot)
+    local cmd = M.import_cmd(file, slot, forms ~= nil)
     note(cmd)
     gma.cmd(cmd)
     call1(gma.sleep, 0.5)
-    local h = form_handle(slot)
-    if not h then
-        return fail(string.format("Nothing arrived in Form %d.\n\nCheck that %s is in the importexport folder of drive %d.", slot, file, drive))
+    local after = slot_info(slot)
+    if not M.imported(before, after, forms and forms[1].name or nil) then
+        local now = after and string.format("Form %d still holds %q.", slot, after.name) or string.format("Form %d is empty.", slot)
+        return fail(string.format("%s was not imported.\n\n%s\nThe import was cancelled, or %s is not in the\nimportexport folder of drive %d.", file, now, file, drive))
     end
-    local name = M.strip_number(call1(O.name, h), slot)
-    note("Form %d is now %q", slot, name)
-    gma.feedback(string.format("%s: Form %d = %s", PLUGIN_TITLE, slot, name))
+    note("Form %d is now %q", slot, after.name)
+    gma.feedback(string.format("%s: Form %d = %s", PLUGIN_TITLE, slot, after.name))
     if not internal then note("drive %d is still selected", drive) end
 end
 

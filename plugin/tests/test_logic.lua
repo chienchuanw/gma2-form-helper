@@ -21,8 +21,10 @@ eq(M.xml_name("/media/usb/gma2/importexport/fh_a.xml"), "fh_a.xml", "drops a Uni
 eq(M.xml_name(""), nil, "empty is rejected")
 eq(M.xml_name('fh_"a'), nil, "a quote would break the command")
 
--- import_cmd: /nc because the plugin asks about overwriting itself
-eq(M.import_cmd("fh_Wave.xml", 30), 'Import "fh_Wave.xml" At Form 30 /nc', "import command")
+-- import_cmd: /nc only when the plugin itself has confirmed every slot;
+-- otherwise MA's own Overwrite Confirmation asks the user.
+eq(M.import_cmd("fh_Wave.xml", 30, true), 'Import "fh_Wave.xml" At Form 30 /nc', "confirmed import")
+eq(M.import_cmd("fh_Wave.xml", 30, false), 'Import "fh_Wave.xml" At Form 30', "let MA ask")
 
 -- parse_slot
 eq(M.parse_slot("12"), 12, "plain number")
@@ -60,6 +62,13 @@ eq(forms[1].name, "Fly & Out", "entities decoded")
 eq(forms[1].graphs, 2, "graph count")
 eq(forms[2].graphs, 1, "self-closing SubForm counted")
 eq(#M.parse_forms("<html></html>"), 0, "not an MA export")
+local mixed = M.parse_forms([[<MA><Form index="0" name="A" /><Form index="1" name="B"><SubForm index="0" /></Form><Form index="2" name="C"/></MA>]])
+eq(#mixed, 3, "self-closing Forms counted")
+eq(mixed[1].name, "A", "first self-closing Form")
+eq(mixed[1].graphs, 0, "self-closing Form has no graphs")
+eq(mixed[2].name, "B", "Form after a self-closing one")
+eq(mixed[2].graphs, 1, "its graph")
+eq(mixed[3].name, "C", "last self-closing Form")
 eq(M.version(xml), "3.9.60", "header version")
 
 -- newest: first fh_*.xml in a newest-first listing
@@ -74,6 +83,14 @@ eq(M.list_cmd("/home/user/gma2/importexport", "LINUX"), 'ls -t "/home/user/gma2/
 -- strip_number: getobj.name appends the pool number
 eq(M.strip_number("Flyout 123", 123), "Flyout", "number removed")
 eq(M.strip_number("Ramp 50 7", 7), "Ramp 50", "only the trailing pool number")
+
+-- imported: did the slot really change?
+eq(M.imported(nil, { handle = 5, name = "A" }, "A"), true, "empty slot now filled")
+eq(M.imported(nil, nil, "A"), false, "nothing arrived")
+eq(M.imported({ handle = 5, name = "Old" }, { handle = 9, name = "A" }, "A"), true, "replaced with the expected Form")
+eq(M.imported({ handle = 5, name = "Old" }, { handle = 5, name = "Old" }, nil), false, "unchanged slot is not a success")
+eq(M.imported({ handle = 5, name = "Old" }, { handle = 9, name = "Other" }, nil), true, "replaced, name unknown beforehand")
+eq(M.imported({ handle = 5, name = "Old" }, { handle = 9, name = "Other" }, "A"), false, "a different Form than the file holds")
 
 print(string.format("%d checks, %d failed", count, fails))
 os.exit(fails == 0 and 0 or 1)

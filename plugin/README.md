@@ -26,13 +26,17 @@ without typing the `Import` command. Tested on grandMA2 onPC 3.9.60.
      from the `SelectDrive` list (type `SelectDrive` in the command line to see it).
    - **Form file**: on the internal drive the newest `fh_*.xml` is filled in.
    - **Import into Form**: the first empty Form slot is filled in.
-3. It shows what the file holds and, if the slot is taken, which Form will be
-   **replaced**. Nothing is overwritten unless you confirm.
-4. It imports and checks that the Form arrived; the result is in the System
-   Monitor and the command line feedback.
+3. It shows what the file holds and which existing Forms would be
+   **replaced** (a file with several Forms fills consecutive slots). Nothing is
+   overwritten unless you confirm.
+4. It imports and checks that the slot really changed; the result is in the
+   System Monitor and the command line feedback, and a failure is shown in a
+   dialog.
 
-When importing from USB the plugin cannot read the file beforehand, so it skips
-the preview and leaves that drive selected afterwards.
+On a USB stick the plugin cannot read the file beforehand, so there is no
+preview. It then imports without `/nc`, and MA shows its own Overwrite
+Confirmation if any existing Form would be replaced. The USB drive stays
+selected afterwards.
 
 ## Develop
 
@@ -53,7 +57,10 @@ To package a release zip:
 ### Notes from the console
 
 - `Import` needs the `.xml` extension when the file name contains a space.
-- Importing into an occupied slot opens an Overwrite Confirmation that a plugin
-  cannot answer; `/nc` replaces silently. The plugin therefore asks first and
-  then imports with `/nc`.
+- Importing into an occupied slot opens MA's Overwrite Confirmation on screen
+  (also from a plugin, which waits for the answer); `/nc` replaces silently.
+  With a readable file the plugin asks about every slot first and uses `/nc`;
+  otherwise it leaves the question to MA.
+- A file with several Forms fills consecutive slots from the target on.
+- `getvar("OS")` is `WINDOWS` on onPC.
 - `gma.show.getobj.handle("Form N")` is nil for an empty slot.
