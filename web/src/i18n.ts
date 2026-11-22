@@ -1,0 +1,91 @@
+import { createContext, useContext } from 'react'
+
+export type Lang = 'en' | 'zh-TW'
+
+const en = {
+  appTitle: 'grandMA2 Form Helper',
+  tagline: 'Draw an effect form and get the exact Graph Editor values.',
+  language: 'Language',
+  formName: 'Form name',
+  importXml: 'Import XML',
+  exportXml: 'Export XML',
+  exportVersion: 'Target version',
+  undo: 'Undo',
+  redo: 'Redo',
+  snap: 'Snap to grid',
+  graphs: 'Graphs',
+  addGraph: 'Add graph',
+  deleteGraph: 'Delete graph',
+  graphName: 'Graph name',
+  graphColor: 'Graph colour',
+  unnamed: 'Graph',
+  points: 'Points',
+  no: 'No.',
+  mode: 'Mode',
+  deletePoint: 'Delete point',
+  copyTable: 'Copy table',
+  copied: 'Copied',
+  canvasLabel: 'Form graph editor. Click to add a point, drag to move it.',
+  canvasHint: 'Click to add a point · drag to move · Delete removes the selected point',
+  selectedMode: 'Mode of selected segment',
+  noSelection: 'Select a point to change the mode of the segment that starts at it.',
+  approximate: 'All segments are Spline with no Break: MA draws this kind of curve slightly differently, so the preview is approximate.',
+  warnSplineJump: 'Two points share an X inside a Spline run. MA does not draw this graph at all.',
+  warnUnpairedBreak: 'Breaks are not paired (Break at Start … Break at End). MA draws this graph erratically.',
+  warnOvershoot: 'The curve shoots far past 0–100 (a Spline next to a near-vertical segment). MA does the same.',
+  pickForm: 'This file has several forms. Pick one to edit:',
+  cancel: 'Cancel',
+  importError: 'Could not read this file:',
+  tableHelp: 'Enter these values in MA: Edit the form, Table Mode, one tab per graph.',
+}
+
+type Strings = typeof en
+
+const zh: Strings = {
+  appTitle: 'grandMA2 Form Helper',
+  tagline: '畫出 Effect Form，直接取得 Graph Editor 要填的數值。',
+  language: '語言',
+  formName: 'Form 名稱',
+  importXml: '匯入 XML',
+  exportXml: '匯出 XML',
+  exportVersion: '目標版本',
+  undo: '復原',
+  redo: '重做',
+  snap: '吸附格線',
+  graphs: 'Graph',
+  addGraph: '新增 graph',
+  deleteGraph: '刪除 graph',
+  graphName: 'Graph 名稱',
+  graphColor: 'Graph 顏色',
+  unnamed: 'Graph',
+  points: '點',
+  no: 'No.',
+  mode: 'Mode',
+  deletePoint: '刪除點',
+  copyTable: '複製表格',
+  copied: '已複製',
+  canvasLabel: 'Form graph 編輯區。點一下新增點，拖曳移動點。',
+  canvasHint: '點一下新增點 · 拖曳移動 · Delete 刪除選取的點',
+  selectedMode: '選取段落的 Mode',
+  noSelection: '選取一個點，即可設定從它開始那一段的 Mode。',
+  approximate: '所有段落都是 Spline 且沒有 Break：MA 對這類曲線的畫法略有不同，預覽為近似。',
+  warnSplineJump: 'Spline 段落中有兩個點的 X 相同，MA 不會畫出這個 graph。',
+  warnUnpairedBreak: 'Break 沒有成對（Break at Start … Break at End），MA 會畫出異常的曲線。',
+  warnOvershoot: '曲線遠遠超出 0–100（Spline 緊鄰近乎垂直的線段），MA 也會這樣。',
+  pickForm: '這個檔案有多個 Form，請選一個來編輯：',
+  cancel: '取消',
+  importError: '無法讀取這個檔案：',
+  tableHelp: '在 MA 中：Edit 這個 Form，切到 Table Mode，每個 graph 一個分頁，照下表輸入。',
+}
+
+export const STRINGS: Record<Lang, Strings> = { en, 'zh-TW': zh }
+
+export function detectLang(languages: readonly string[]): Lang {
+  return languages[0]?.toLowerCase().startsWith('zh') ? 'zh-TW' : 'en'
+}
+
+export const LangContext = createContext<Lang>('en')
+
+export function useStrings(): Strings {
+  return STRINGS[useContext(LangContext)]
+}

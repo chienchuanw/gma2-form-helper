@@ -1,1 +1,412 @@
+:root {
+  --bg: #121417;
+  --surface: #1a1d21;
+  --surface-2: #22262b;
+  --border: #33383f;
+  --text: #e6e8eb;
+  --muted: #9aa1aa;
+  --accent: #f0b429;
+  --accent-text: #1a1406;
+  --plot-bg: #0b0c0e;
+  --grid: #2a2e34;
+  --point: #ff5a4f;
+  --warn: #f0b429;
+  --error: #ff6b6b;
+  --focus: #6cb6ff;
+  color-scheme: dark;
+  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', 'Noto Sans TC', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
 
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #eef0f3;
+    --border: #d5d9df;
+    --text: #1b1e22;
+    --muted: #5d6570;
+    --accent: #b7791f;
+    --accent-text: #ffffff;
+    --plot-bg: #111316;
+    --grid: #2a2e34;
+    --warn: #8a5a00;
+    --error: #c62828;
+    --focus: #1f6feb;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+#root {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+button,
+.button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+.button:hover {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+button.icon {
+  padding: 2px 8px;
+  line-height: 1.2;
+}
+
+input,
+select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+input[type='checkbox'] {
+  padding: 0;
+}
+
+input[type='color'] {
+  width: 40px;
+  height: 32px;
+  padding: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+label.inline input,
+label.inline select {
+  color: var(--text);
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 460px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.editor,
+.values {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.values .toolbar {
+  justify-content: space-between;
+}
+
+.values > .muted {
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  user-select: none;
+  cursor: crosshair;
+  border-radius: 6px;
+  background: var(--plot-bg);
+}
+
+.plot-bg {
+  fill: var(--plot-bg);
+}
+
+.grid-line {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+
+.grid-line.minor {
+  stroke-dasharray: 2 6;
+  opacity: 0.7;
+}
+
+.tick text {
+  fill: #8b929b;
+  font-size: 13px;
+}
+
+.curve {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.curve.active {
+  stroke-width: 2.5;
+}
+
+.curve.other {
+  stroke-width: 1.5;
+  opacity: 0.35;
+}
+
+.point {
+  fill: var(--point);
+  stroke: #0b0c0e;
+  stroke-width: 1.5;
+  cursor: grab;
+}
+
+.point.selected {
+  fill: #fff;
+  stroke: var(--point);
+  stroke-width: 3;
+}
+
+.hint {
+  font-size: 0.85rem;
+  margin: 6px 0 12px;
+}
+
+.graph-tabs [role='tablist'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tab[aria-selected='true'] {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.tab.add {
+  border-color: transparent;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.graph-props {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.graph-props label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.notices {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.notices:empty {
+  display: none;
+}
+
+.notice {
+  padding: 8px 12px;
+  border-left: 3px solid var(--muted);
+  background: var(--surface-2);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.notice.warn {
+  border-left-color: var(--warn);
+}
+
+.notice.error {
+  border-left-color: var(--error);
+  margin-bottom: 12px;
+}
+
+table.points {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+table.points th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+table.points td {
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+table.points tr.selected td {
+  background: var(--surface-2);
+}
+
+table.points td.num {
+  color: var(--muted);
+  width: 2.5em;
+}
+
+table.points input[type='number'] {
+  width: 5em;
+}
+
+table.points select {
+  width: 100%;
+  min-width: 0;
+}
+
+dialog.picker {
+  max-width: min(480px, 92vw);
+  max-height: 80vh;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 16px;
+}
+
+dialog.picker::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+
+dialog.picker ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 4px;
+  max-height: 55vh;
+  overflow: auto;
+}
+
+dialog.picker li button {
+  width: 100%;
+  justify-content: space-between;
+}
