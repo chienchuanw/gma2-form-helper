@@ -1,12 +1,10 @@
 import { evaluate } from '../core/evaluate'
-import type { Graph } from '../core/model'
+import { clamp01, type Graph } from '../core/model'
 
 /** SVG layout of the plot: viewBox units, with room for axis labels. */
 export const PLOT = { left: 48, top: 16, width: 1000, height: 500, right: 16, bottom: 32 }
 export const VIEW_W = PLOT.left + PLOT.width + PLOT.right
 export const VIEW_H = PLOT.top + PLOT.height + PLOT.bottom
-
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 export function toSvg(x: number, y: number): [number, number] {
   return [PLOT.left + x * PLOT.width, PLOT.top + (1 - y) * PLOT.height]
@@ -14,11 +12,6 @@ export function toSvg(x: number, y: number): [number, number] {
 
 export function fromSvg(sx: number, sy: number): [number, number] {
   return [clamp01((sx - PLOT.left) / PLOT.width), clamp01(1 - (sy - PLOT.top) / PLOT.height)]
-}
-
-/** Snap a 0–1 value to a grid step (0 = off). */
-export function snap(v: number, step: number): number {
-  return step > 0 ? Math.round(v / step) * step : v
 }
 
 /**

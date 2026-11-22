@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useRef, useState, type ChangeEvent } from 'react'
 import { analyzeGraph } from './core/evaluate'
-import { fitStroke, precisionToTolerance } from './core/fit'
+import { fitStroke, precisionToTolerance, strokeSpan, type Sample } from './core/fit'
 import type { Form } from './core/model'
 import { tableText } from './core/table'
 import { DEFAULT_VERSION, exportFileName, parseFormsXml, serializeFormsXml } from './core/xml'
@@ -9,7 +9,7 @@ import { GraphCanvas, type SnapGrid, type Tool } from './editor/GraphCanvas'
 import { GraphTabs } from './editor/GraphTabs'
 import { ModeSelect } from './editor/ModeSelect'
 import { PointTable } from './editor/PointTable'
-import { initialState, reducer } from './editor/state'
+import { initialState, isLatestStroke, reducer } from './editor/state'
 import { LangContext, STRINGS, detectLang, type Lang } from './i18n'
 
 /** Versions whose import has been verified on a console or onPC. */
@@ -23,7 +23,7 @@ export default function App() {
   const [tool, setTool] = useState<Tool>('edit')
   const [precision, setPrecision] = useState(5)
   /** The last freehand stroke, so the precision slider can re-fit it. */
-  const lastStroke = useRef<{ id: number; samples: { x: number; y: number }[] } | null>(null)
+  const lastStroke = useRef<{ id: number; samples: Sample[] } | null>(null)
   const [version, setVersion] = useState(DEFAULT_VERSION)
   const [choices, setChoices] = useState<Form[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,14 +70,14 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const fitInto = (id: number, samples: { x: number; y: number }[], p: number) => {
+  const fitInto = (id: number, samples: Sample[], p: number) => {
+    const span = strokeSpan(samples)
     const points = fitStroke(samples, { tolerance: precisionToTolerance(p), grid: snapOn ? SNAP : null })
-    if (points.length === 0) return
-    const xs = samples.map((s) => s.x)
-    dispatch({ type: 'drawStroke', stroke: id, from: Math.min(...xs), to: Math.max(...xs), points })
+    if (!span || points.length === 0) return
+    dispatch({ type: 'drawStroke', stroke: id, ...span, points })
   }
 
-  const onStroke = (samples: { x: number; y: number }[]) => {
+  const onStroke = (samples: Sample[]) => {
     const id = (lastStroke.current?.id ?? 0) + 1
     lastStroke.current = { id, samples }
     fitInto(id, samples, precision)
@@ -87,7 +87,7 @@ export default function App() {
     setPrecision(p)
     // Re-fit only while the stroke is still the latest edit.
     const last = lastStroke.current
-    if (last && history.lastKind === `stroke:${last.id}`) fitInto(last.id, last.samples, p)
+    if (last && isLatestStroke(history, last.id)) fitInto(last.id, last.samples, p)
   }
 
   const onImport = async (e: ChangeEvent<HTMLInputElement>) => {

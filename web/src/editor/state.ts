@@ -112,6 +112,11 @@ function apply(h: History, action: Action): History {
   }
 }
 
+/** True while the given stroke is still the latest edit, so it can be re-fitted in place. */
+export function isLatestStroke(h: History, stroke: number): boolean {
+  return h.lastKind === `stroke:${stroke}`
+}
+
 /** Edits that arrive in a continuous stream (typing a name, dragging a colour picker). */
 function coalesceKind(action: Action): string | undefined {
   if (action.type === 'setFormName') return 'formName'
