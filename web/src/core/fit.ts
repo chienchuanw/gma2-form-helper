@@ -54,7 +54,7 @@ const MAX_REFINE = 60
 export function fitStroke(samples: readonly Sample[], opts: FitOptions): Point[] {
   const tol = Math.max(1e-4, opts.tolerance)
   const lock = opts.mode ?? 'auto'
-  if (lock === 'step') return fitSteps(monotonic(samples), tol, opts.grid ?? null)
+  if (lock === 'step') return fitSteps(split(monotonic(samples)), tol, opts.grid ?? null)
   const pieces = split(monotonic(samples))
   if (pieces.length === 0) return []
 
@@ -345,27 +345,30 @@ function worstSample(pieces: Sample[][], keys: number[][], points: Point[], tol:
 
 /**
  * A staircase of Step (End) points: each step holds the middle of a band at most
- * 2 × tol tall, and a new step starts where the stroke leaves the band.
+ * 2 × tol tall, and a new step starts where the stroke leaves the band. A drawn
+ * jump (between pieces) is one step change rather than a run of tiny steps.
  */
-function fitSteps(s: Sample[], tol: number, grid: { x: number; y: number } | null): Point[] {
-  if (s.length === 0) return []
+function fitSteps(pieces: Sample[][], tol: number, grid: { x: number; y: number } | null): Point[] {
+  if (pieces.length === 0) return []
   const sx = (x: number) => roundCoord(grid ? snap(x, grid.x) : x)
   const sy = (y: number) => roundCoord(grid ? snap(y, grid.y) : y)
-  const steps: { x: number; lo: number; hi: number }[] = [{ x: s[0].x, lo: s[0].y, hi: s[0].y }]
-  for (const p of s) {
-    const cur = steps[steps.length - 1]
-    const lo = Math.min(cur.lo, p.y)
-    const hi = Math.max(cur.hi, p.y)
-    if (hi - lo > 2 * tol) steps.push({ x: p.x, lo: p.y, hi: p.y })
-    else Object.assign(cur, { lo, hi })
+  const steps: { x: number; lo: number; hi: number }[] = []
+  for (const piece of pieces) {
+    steps.push({ x: piece[0].x, lo: piece[0].y, hi: piece[0].y })
+    for (const p of piece) {
+      const cur = steps[steps.length - 1]
+      const lo = Math.min(cur.lo, p.y)
+      const hi = Math.max(cur.hi, p.y)
+      if (hi - lo > 2 * tol) steps.push({ x: p.x, lo: p.y, hi: p.y })
+      else Object.assign(cur, { lo, hi })
+    }
   }
   const out: Point[] = []
   for (const st of steps) {
     const p: Point = { x: sx(st.x), y: sy((st.lo + st.hi) / 2), mode: 'step_end' }
     if (p.x >= 1 && out.length > 0) break // a step starting at the end of the cycle has no width
-    const prev = out[out.length - 1]
-    if (prev && prev.x === p.x) out[out.length - 1] = p // a later step on the same grid line wins
-    else if (!prev || prev.y !== p.y) out.push(p) // merge equal neighbours
+    if (out.length && out[out.length - 1].x === p.x) out.pop() // a later step on the same grid line wins
+    if (!out.length || out[out.length - 1].y !== p.y) out.push(p) // equal neighbours are one step
   }
   return out
 }

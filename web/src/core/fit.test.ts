@@ -223,6 +223,13 @@ describe('fitStroke', () => {
       expect(maxError({ color: '', points: coarse }, ramp)).toBeLessThanOrEqual(0.055)
     })
 
+    it('turns a drawn edge into one step change, not a run of tiny steps', () => {
+      const f = (x: number) => (x < 0.4 ? 0.2 : x < 0.41 ? 0.2 + (x - 0.4) * 70 : 0.9)
+      const pts = fitStroke(stroke(f, 0, 1, 600, 0.002), { tolerance: 0.02, mode: 'step' })
+
+      expect(pts.length).toBeLessThanOrEqual(3)
+    })
+
     it('does not start a step at the very end of the cycle, where it would have no width', () => {
       // The settings of the browser session that showed it: precision 5, snap on.
       const pts = fitStroke(stroke((x) => 0.1 + 0.8 * x, 0, 1, 200, 0), { tolerance: precisionToTolerance(5), mode: 'step', grid: { x: 0.125, y: 0.1 } })
