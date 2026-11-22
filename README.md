@@ -9,7 +9,7 @@ what you see is what MA draws.
 > 每個點要填的 X、Y、Mode，或匯出 MA 可直接匯入的 XML。預覽依照在 grandMA2
 > 實測校正的曲線規則繪製，看到的就是 MA 會畫出的樣子。介面支援繁體中文。
 
-**Web app:** _URL added on deployment_
+**Web app:** https://gma2-form-helper.vercel.app
 
 ## Features
 
@@ -89,6 +89,14 @@ Plugin:
 ```sh
 lua plugin/tests/test_logic.lua
 ./scripts/build-plugin.sh          # -> dist/form-helper-import.zip
+```
+
+Deploy (Vercel project `gma2-form-helper` in the Take Two Studio team, built
+from `web/`):
+
+```sh
+cd web
+vercel deploy --prod --scope take-two-studio
 ```
 
 ## Release checklist
