@@ -319,8 +319,11 @@ function build(
     if (seg.jump || !curvedAt(i)) return 'linear'
     // Chain boundaries at sharp corners become a break pair; a chain of one
     // segment between two corners cannot curve (its ends would be parabolic).
-    const startsAtCorner = cornerAt(i) && curvedAt(i - 1)
-    const endsAtCorner = cornerAt(i + 1) && curvedAt(i + 1)
+    // Under the Spline lock the chain also breaks where it meets the Linear bridge
+    // into kept points, so it never inherits that bridge's (possibly near-vertical) slope.
+    const atBridge = lock === 'spline' && bridged
+    const startsAtCorner = (cornerAt(i) && curvedAt(i - 1)) || (atBridge && i === 0)
+    const endsAtCorner = (cornerAt(i + 1) && curvedAt(i + 1)) || (atBridge && i + 1 === n - 1)
     if (startsAtCorner && endsAtCorner) return lock === 'spline' ? 'spline' : 'linear'
     if (startsAtCorner) return 'spline_break_start'
     if (endsAtCorner) return 'spline_break_end'

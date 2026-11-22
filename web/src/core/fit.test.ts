@@ -264,6 +264,20 @@ describe('fitStroke', () => {
       expect(bad / total).toBeLessThan(0.05)
     })
 
+    it('does not let a Spline-locked stroke inherit a near-vertical bridge into kept points', () => {
+      // Reviewer's repro: a flat stroke at 90 whose snapped end lands right next to a kept point.
+      const context: Point[] = [
+        { x: 0, y: 0, mode: 'linear' },
+        { x: 0.5, y: 1, mode: 'linear' },
+        { x: 0.885, y: 0, mode: 'linear' },
+      ]
+      const pts = fitStroke(stroke(() => 0.9, 0.55, 0.82, 150, 0), { tolerance: precisionToTolerance(5), grid: { x: 0.125, y: 0.1 }, mode: 'spline', context })
+      const lo = Math.min(0.55, pts[0].x), hi = Math.max(0.82, pts[pts.length - 1].x)
+      const g = { color: '', points: drawable(sortPoints([...context.filter((p) => p.x < lo - 1e-9 || p.x > hi + 1e-9), ...pts])) }
+
+      expect(maxError(g, () => 0.9, 0.55, 0.82)).toBeLessThan(0.1)
+    })
+
     it('keeps locked fits drawable in MA, with and without snapping (fuzz)', () => {
       let seed = 3
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
