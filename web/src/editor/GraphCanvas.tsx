@@ -24,7 +24,8 @@ const TICKS = Array.from({ length: 11 }, (_, i) => i / 10)
 export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
   const t = useStrings()
   const svgRef = useRef<SVGSVGElement>(null)
-  const dragging = useRef(false)
+  /** pointerId of the pointer dragging a point, or null. */
+  const dragging = useRef<number | null>(null)
   const graph = form.graphs[active]
 
   const toView = (e: PointerEvent): [number, number] => {
@@ -38,6 +39,9 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
 
   const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
     if (e.button > 0 || e.isPrimary === false) return // ignore right-clicks and extra fingers
+    // Commit a value still being typed in the table before rows can shift.
+    const focused = document.activeElement
+    if (focused instanceof HTMLInputElement) focused.blur()
     const [sx, sy] = toView(e)
     const width = svgRef.current!.getBoundingClientRect().width || VIEW_W
     const hit = nearestPoint(graph, sx, sy, Math.max(8, (HIT_PX * VIEW_W) / width))
@@ -47,20 +51,20 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
       return
     }
     dispatch({ type: 'beginDrag', index: hit })
-    dragging.current = true
+    dragging.current = e.pointerId
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
 
   // The reducer moves whichever point is selected, so fast moves never hit a stale index.
   const onPointerMove = (e: PointerEvent<SVGSVGElement>) => {
-    if (!dragging.current) return
+    if (dragging.current !== e.pointerId) return
     const [x, y] = snapped(...toView(e))
     dispatch({ type: 'dragTo', x, y })
   }
 
-  const endDrag = () => {
-    if (!dragging.current) return
-    dragging.current = false
+  const endDrag = (e: PointerEvent<SVGSVGElement>) => {
+    if (dragging.current !== e.pointerId) return
+    dragging.current = null
     dispatch({ type: 'endDrag' })
   }
 
