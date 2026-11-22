@@ -13,7 +13,8 @@ import type { Graph, Mode, Point } from './model'
  *   the chain at the end of its segment; a chain's own break end is parabolic
  *   (m0 + m1 = 2 * secant), which leaves a corner. Every other chain end takes the
  *   slope of the neighbouring segment: its secant for a linear segment or for the
- *   first/last segment of a broken neighbour chain, 0 for a step.
+ *   first/last segment of a broken neighbour chain, 0 for a step, and a natural
+ *   end next to a zero-width jump.
  *   A graph made only of spline segments without breaks is one closed periodic
  *   spline; that case matches MA only approximately.
  */
