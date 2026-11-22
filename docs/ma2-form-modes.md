@@ -35,9 +35,9 @@ How a chain ends:
 - **Next to a Linear segment**: the chain takes that segment's slope, so the
   curve joins the line smoothly (it can overshoot the point to do so).
 - **Next to a broken chain** (the next segment is Break at Start, or the previous
-  one is Break at End): the chain takes the secant of that neighbouring segment,
-  joining the broken chain smoothly from outside while the broken chain itself
-  keeps its corner. Measured for the Break at Start side (Form 101); the Break at
+  one is Break at End): the chain takes the secant of that neighbouring segment.
+  The broken chain starts with its own (parabolic) slope, so there is still a
+  corner at the join (Form 101 at x = 30: slope 4 arriving, 8.67 leaving). Measured for the Break at Start side (Form 101); the Break at
   End side is assumed symmetric.
 - **Next to a Step segment**: slope 0 (steps are flat). Measured for both Step
   (Start) and Step (End).
@@ -46,8 +46,11 @@ How a chain ends:
 
 Taking a neighbour's slope means a chain next to a *near-vertical* segment (say
 a Linear segment 0.3 wide) is clamped to a huge slope and shoots far off the
-chart. MA does exactly the same (captured), so the tool reproduces it and
-`analyzeGraph()` warns `overshoot`.
+chart. Lab captures showed MA shooting off the chart in the same situations (a
+chain next to a 0.3-wide Linear segment, and a closed spline with a 0.3-wide
+segment); the off-chart part cannot be measured, so the tool reproduces the
+model and `analyzeGraph()` warns `overshoot`. For closed all-spline graphs the
+warning comes from the approximate model.
 
 ## Accuracy
 
