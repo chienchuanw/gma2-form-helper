@@ -278,13 +278,15 @@ function Start()
         return fail(string.format("%s was not imported.\n\n%s\nThe import was cancelled, or %s is not in the\nimportexport folder of drive %d.", file, now, file, drive))
     end
     if result == "unknown" then
-        note("Form %d holds %q, as before: the import cannot be confirmed (same name)", slot, after.name)
+        note("Form %d still holds %q: the import cannot be confirmed", slot, after.name)
         call1(gma.gui.msgbox, PLUGIN_TITLE, string.format("Form %d holds %q, as it did before.\n\n" ..
-            "If the import went through it replaced a Form of the same name;\nif it was cancelled nothing changed. Check the Form to be sure.", slot, after.name))
+            "Either the import replaced it with a Form of the same name, or nothing\n" ..
+            "was imported (cancelled, or %s is not on drive %d).\nCheck the Form to be sure.", slot, after.name, file, drive))
+        gma.feedback(string.format("%s: Form %d unconfirmed (%s)", PLUGIN_TITLE, slot, after.name))
     else
         note("Form %d is now %q", slot, after.name)
+        gma.feedback(string.format("%s: Form %d = %s", PLUGIN_TITLE, slot, after.name))
     end
-    gma.feedback(string.format("%s: Form %d = %s", PLUGIN_TITLE, slot, after.name))
     if not internal then note("drive %d is still selected", drive) end
 end
 
