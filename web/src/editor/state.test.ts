@@ -153,6 +153,33 @@ describe('editor reducer', () => {
     expect(pts(h)[1]).toMatchObject({ x: 0.5, y: 1 })
   })
 
+  it('replaces the drawn span with a fitted stroke as one undo step', () => {
+    let h = reducer(start(), { type: 'addPoint', x: 0.9, y: 0.4 })
+    h = reducer(h, {
+      type: 'drawStroke',
+      stroke: 1,
+      from: 0.2,
+      to: 0.6,
+      points: [
+        { x: 0.2, y: 0.1, mode: 'linear' },
+        { x: 0.6, y: 0.7, mode: 'linear' },
+      ],
+    })
+
+    expect(pts(h).map((p) => p.x)).toEqual([0, 0.2, 0.6, 0.9])
+    h = reducer(h, { type: 'undo' })
+    expect(pts(h).map((p) => p.x)).toEqual([0, 0.5, 0.9])
+  })
+
+  it('re-fits the same stroke in place without a new undo step', () => {
+    const fit = (y: number) => ({ type: 'drawStroke' as const, stroke: 7, from: 0.2, to: 0.6, points: [{ x: 0.3, y, mode: 'spline' as const }] })
+    let h = reducer(start(), fit(0.1))
+    h = reducer(h, fit(0.2))
+
+    expect(h.past).toHaveLength(1)
+    expect(pts(h).find((p) => p.x === 0.3)?.y).toBe(0.2)
+  })
+
   it('does not record renames or recolours that change nothing', () => {
     let h = reducer(start(), { type: 'renameGraph', index: 0, name: '' })
     h = reducer(h, { type: 'setGraphColor', index: 0, color: 'c0c0c0' })

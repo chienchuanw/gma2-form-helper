@@ -83,7 +83,7 @@ describe('fitStroke', () => {
   })
 
   it('fits only the span that was drawn', () => {
-    const g = graphOf(stroke((x) => 0.5, 0.2, 0.6), 0.02)
+    const g = graphOf(stroke(() => 0.5, 0.2, 0.6), 0.02)
 
     expect(Math.min(...g.points.map((p) => p.x))).toBeCloseTo(0.2, 2)
     expect(Math.max(...g.points.map((p) => p.x))).toBeCloseTo(0.6, 2)

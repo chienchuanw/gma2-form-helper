@@ -33,6 +33,11 @@ export type Action =
   | { type: 'dragTo'; x: number; y: number }
   | { type: 'endDrag' }
   | { type: 'nudgePoint'; dx: number; dy: number }
+  /**
+   * Replace the active graph's points between from and to with a fitted stroke.
+   * Re-fitting the same stroke (same id) replaces it without a new undo step.
+   */
+  | { type: 'drawStroke'; stroke: number; from: number; to: number; points: readonly Point[] }
   | { type: 'setActive'; index: number }
   | { type: 'addGraph' }
   | { type: 'deleteGraph'; index: number }
@@ -111,6 +116,7 @@ function apply(h: History, action: Action): History {
 function coalesceKind(action: Action): string | undefined {
   if (action.type === 'setFormName') return 'formName'
   if (action.type === 'setGraphColor') return `color:${action.index}`
+  if (action.type === 'drawStroke') return `stroke:${action.stroke}`
   return undefined
 }
 
@@ -161,6 +167,11 @@ function edit(s: EditorState, action: Action): EditorState {
       }
       if (p.x === old.x && p.y === old.y && p.mode === old.mode) return s
       return withPoints(s, graph.points.map((q, i) => (i === action.index ? p : q)), p)
+    }
+    case 'drawStroke': {
+      const kept = graph.points.filter((p) => p.x < action.from - 1e-9 || p.x > action.to + 1e-9)
+      const points = sortPoints([...kept, ...action.points])
+      return { ...withGraph(s, s.active, { ...graph, points }), selected: null }
     }
     case 'deletePoint':
       return {
