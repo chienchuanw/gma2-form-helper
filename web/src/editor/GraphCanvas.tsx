@@ -52,7 +52,7 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
     if (tool === 'draw') {
       dragging.current = e.pointerId
       setStroke([fromSvg(sx, sy)])
-      e.currentTarget.setPointerCapture?.(e.pointerId)
+      capture(e)
       return
     }
     const width = svgRef.current!.getBoundingClientRect().width || VIEW_W
@@ -64,7 +64,7 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
     }
     dispatch({ type: 'beginDrag', index: hit })
     dragging.current = e.pointerId
-    e.currentTarget.setPointerCapture?.(e.pointerId)
+    capture(e)
   }
 
   // The reducer moves whichever point is selected, so fast moves never hit a stale index.
@@ -152,6 +152,15 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
       })}
     </svg>
   )
+}
+
+/** Keep receiving moves outside the SVG; harmless if the pointer cannot be captured. */
+function capture(e: PointerEvent<SVGSVGElement>) {
+  try {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  } catch {
+    // e.g. the pointer is already gone
+  }
 }
 
 const onTick = (v: number) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-6
