@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<MA xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.malighting.de/grandma2/xml/MA" xsi:schemaLocation="http://schemas.malighting.de/grandma2/xml/MA http://schemas.malighting.de/grandma2/xml/3.9.60/MA.xsd" major_vers="3" minor_vers="9" stream_vers="60">
+	<Info datetime="2026-11-22T21:01:05" showfile="form-helper-lab" />
+	<Form index="100" name="FH Modes" display_2d="false">
+		<SubForm index="0" name="modes" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" y="0.2" mode="linear" />
+			<SubFormPoint index="1" x="0.15000001" y="0.80000001" mode="spline" />
+			<SubFormPoint index="2" x="0.30000001" y="0.30000001" mode="spline_break_start" />
+			<SubFormPoint index="3" x="0.44999999" y="0.89999998" mode="spline_break_end" />
+			<SubFormPoint index="4" x="0.60000002" y="0.1" mode="step_start" />
+			<SubFormPoint index="5" x="0.75" y="0.69999999" mode="step_end" />
+			<SubFormPoint index="6" x="0.89999998" y="0.40000001" mode="linear" />
+		</SubForm>
+		<SubForm index="1" name="second" display_spec_index="0" graph_color="30c0c0">
+			<SubFormPoint index="0" y="1" mode="linear" />
+			<SubFormPoint index="1" x="0.5" mode="linear" />
+		</SubForm>
+	</Form>
+	<Form index="101" name="Spline" display_2d="false">
+		<SubForm index="0" name="Spline" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="spline" />
+			<SubFormPoint index="1" x="1" y="1" mode="spline" />
+		</SubForm>
+	</Form>
+	<Form index="102" name="Spline (Break at Start)" display_2d="false">
+		<SubForm index="0" name="Spline (Break at Start)" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="spline_break_start" />
+			<SubFormPoint index="1" x="1" y="1" mode="spline_break_start" />
+		</SubForm>
+	</Form>
+	<Form index="103" name="Spline (Break at End)" display_2d="false">
+		<SubForm index="0" name="Spline (Break at End)" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="spline_break_end" />
+			<SubFormPoint index="1" x="1" y="1" mode="spline_break_end" />
+		</SubForm>
+	</Form>
+	<Form index="104" name="Step (Start)" display_2d="false">
+		<SubForm index="0" name="Step (Start)" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="step_start" />
+			<SubFormPoint index="1" x="1" y="1" mode="step_start" />
+		</SubForm>
+	</Form>
+	<Form index="105" name="Step (End)" display_2d="false">
+		<SubForm index="0" name="Step (End)" display_spec_index="0" graph_color="c0c0c0">
+			<SubFormPoint index="0" mode="step_end" />
+			<SubFormPoint index="1" x="1" y="1" mode="step_end" />
+		</SubForm>
+	</Form>
+</MA>
