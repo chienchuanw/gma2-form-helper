@@ -102,6 +102,17 @@ function split(s: Sample[]): Sample[][] {
   while (i < s.length - 1) {
     let j = i
     while (j + 1 < s.length && s[j + 1].x - s[i].x < JUMP_DX) j++
+    if (j > i && Math.abs(s[j].y - s[i].y) >= JUMP_DY) {
+      // Follow the climb to its end: keep going while it stays steep in the same direction.
+      const dir = Math.sign(s[j].y - s[i].y)
+      const steep = JUMP_DY / JUMP_DX
+      while (j + 1 < s.length) {
+        const dx = s[j + 1].x - s[j].x
+        const dy = (s[j + 1].y - s[j].y) * dir
+        if (dy <= 0 || dy < steep * dx) break
+        j++
+      }
+    }
     const rise = s[j].y - s[i].y
     if (j > i && Math.abs(rise) >= JUMP_DY) {
       let start = i + 1

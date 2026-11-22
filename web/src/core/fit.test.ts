@@ -167,6 +167,14 @@ describe('fitStroke', () => {
     }
   })
 
+  it('keeps a quickly drawn, slightly slanted edge vertical when snapping', () => {
+    const f = (x: number) => (x < 0.37 ? 0.2 : x < 0.375 ? 0.2 + ((x - 0.37) / 0.005) * 0.7 : 0.9)
+    const g = { color: '', points: fitStroke(stroke(f, 0, 1, 600, 0), { tolerance: 0.02, grid: { x: 0.125, y: 0.1 } }) }
+
+    expect(evaluate(g, 0.3)).toBeCloseTo(0.2, 1)
+    expect(evaluate(g, 0.4)).toBeCloseTo(0.9, 1)
+  })
+
   it('returns nothing for a stroke too short to fit', () => {
     expect(fitStroke([{ x: 0.5, y: 0.5 }], { tolerance: 0.02 })).toEqual([])
   })
