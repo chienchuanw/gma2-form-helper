@@ -83,6 +83,8 @@
 
 - 匯出：`Export Form 1 Thru 60 "name" /o`，檔案會寫到 `<版本資料夾>\importexport\name.xml`。
 - 匯入：`Import "fh_modes" At Form 101`，輸出 `1 object(s) from "fh_modes.xml" imported.`。手寫的 XML 已經驗證可以匯入，2 個 graph、6 種 Mode 都正確。
+- **匯入到已有 Form 的格位時，MA 會跳出 Overwrite Confirmation 對話框**（選項：Overwrite / Overwrite|All / Insert / Insert|All / Cancel），加 `/o` 也一樣。用 `Delete Form N /nc` 可以不經確認刪除。plugin 要考慮這一點。
+- 匯入時，同一個 X 的多個點會保持檔案裡的順序。
 - 透過 Telnet 可以列出點：`cd Form 101`、`cd 1`、`List`，會顯示 X / Y / Mode 的表格。可以用來在測試中驗證匯入結果。
 
 ### 3.4 尚未查證（實作時先驗證）

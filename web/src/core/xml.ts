@@ -1,4 +1,4 @@
-import { MODES, type Form, type Graph, type Mode, type Point } from './model'
+import { MODES, sortPoints, type Form, type Graph, type Mode, type Point } from './model'
 
 export class FormXmlError extends Error {}
 
@@ -23,13 +23,11 @@ function parseForm(el: Element): Form {
 }
 
 function parseGraph(el: Element): Graph {
-  const graph: Graph = {
+  return {
+    name: el.getAttribute('name') ?? undefined,
     color: el.getAttribute('graph_color') ?? 'c0c0c0',
     points: sortPoints(children(el, 'SubFormPoint').map(parsePoint)),
   }
-  const name = el.getAttribute('name')
-  if (name !== null) graph.name = name
-  return graph
 }
 
 function parsePoint(el: Element): Point {
@@ -55,40 +53,27 @@ function num(el: Element, attr: string): number {
   return n
 }
 
-/** Stable sort by x: points sharing an x keep their file order (MA's creation order). */
-export function sortPoints(points: Point[]): Point[] {
-  return points
-    .map((p, i) => ({ p, i }))
-    .sort((a, b) => a.p.x - b.p.x || a.i - b.i)
-    .map(({ p }) => p)
-}
-
 function children(el: Element, name: string): Element[] {
   return Array.from(el.children).filter((c) => c.localName === name)
 }
 
-export interface MaVersion {
-  major: number
-  minor: number
-  stream: number
-}
-
-export const DEFAULT_VERSION: MaVersion = { major: 3, minor: 9, stream: 60 }
+/** grandMA2 software version written into the file header, e.g. "3.9.60". */
+export const DEFAULT_VERSION = '3.9.60'
 
 export interface SerializeOptions {
-  version?: MaVersion
+  version?: string
   /** Timestamp written to <Info datetime>; defaults to now. */
   date?: Date
 }
 
 /** Write Forms as a grandMA2 export file that `Import "file" At Form N` accepts. */
 export function serializeFormsXml(forms: Form[], opts: SerializeOptions = {}): string {
-  const v = opts.version ?? DEFAULT_VERSION
-  const vs = `${v.major}.${v.minor}.${v.stream}`
+  const vs = opts.version ?? DEFAULT_VERSION
+  const [major, minor, stream] = vs.split('.')
   const date = (opts.date ?? new Date()).toISOString().slice(0, 19)
   const lines = [
     '<?xml version="1.0" encoding="utf-8"?>',
-    `<MA xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.malighting.de/grandma2/xml/MA" xsi:schemaLocation="http://schemas.malighting.de/grandma2/xml/MA http://schemas.malighting.de/grandma2/xml/${vs}/MA.xsd" major_vers="${v.major}" minor_vers="${v.minor}" stream_vers="${v.stream}">`,
+    `<MA xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.malighting.de/grandma2/xml/MA" xsi:schemaLocation="http://schemas.malighting.de/grandma2/xml/MA http://schemas.malighting.de/grandma2/xml/${vs}/MA.xsd" major_vers="${major}" minor_vers="${minor}" stream_vers="${stream}">`,
     `\t<Info datetime="${date}" showfile="gma2-form-helper" />`,
   ]
   forms.forEach((form, fi) => {
