@@ -1,0 +1,116 @@
+import { describe, expect, it } from 'vitest'
+import type { Form } from '../core/model'
+import { initialState, reducer, type History } from './state'
+
+const form = (): Form => ({
+  name: 'T',
+  display2d: false,
+  graphs: [
+    {
+      color: 'c0c0c0',
+      points: [
+        { x: 0, y: 0, mode: 'linear' },
+        { x: 0.5, y: 1, mode: 'spline' },
+      ],
+    },
+  ],
+})
+
+const start = (): History => reducer(initialState(), { type: 'load', form: form() })
+const pts = (h: History) => h.present.form.graphs[h.present.active].points
+
+describe('editor reducer', () => {
+  it('adds a point, rounded, inheriting the mode of the segment it lands in, and selects it', () => {
+    const h = reducer(start(), { type: 'addPoint', x: 0.71234, y: 0.33333 })
+
+    expect(pts(h)).toEqual([
+      { x: 0, y: 0, mode: 'linear' },
+      { x: 0.5, y: 1, mode: 'spline' },
+      { x: 0.712, y: 0.333, mode: 'spline' },
+    ])
+    expect(h.present.selected).toBe(2)
+  })
+
+  it('moves a point, keeps points sorted and follows the selection', () => {
+    let h = reducer(start(), { type: 'addPoint', x: 0.8, y: 0.2 })
+    h = reducer(h, { type: 'movePoint', index: 2, x: 0.25, y: 0.5 })
+
+    expect(pts(h).map((p) => p.x)).toEqual([0, 0.25, 0.5])
+    expect(h.present.selected).toBe(1)
+  })
+
+  it('clamps moved points into 0–1', () => {
+    const h = reducer(start(), { type: 'movePoint', index: 1, x: 1.4, y: -0.2 })
+
+    expect(pts(h)[1]).toMatchObject({ x: 1, y: 0 })
+  })
+
+  it('edits a point from the table with two-decimal precision on the 0–100 scale', () => {
+    const h = reducer(start(), { type: 'setPoint', index: 1, x: 0.123456, mode: 'step_end' })
+
+    expect(pts(h)[1]).toEqual({ x: 0.1235, y: 1, mode: 'step_end' })
+  })
+
+  it('deletes a point and clears the selection', () => {
+    let h = reducer(start(), { type: 'select', index: 1 })
+    h = reducer(h, { type: 'deletePoint', index: 1 })
+
+    expect(pts(h)).toHaveLength(1)
+    expect(h.present.selected).toBeNull()
+  })
+
+  it('undoes and redoes edits', () => {
+    let h = reducer(start(), { type: 'addPoint', x: 0.8, y: 0.2 })
+    h = reducer(h, { type: 'undo' })
+    expect(pts(h)).toHaveLength(2)
+    h = reducer(h, { type: 'redo' })
+    expect(pts(h)).toHaveLength(3)
+  })
+
+  it('records a whole drag as one undo step', () => {
+    let h = reducer(start(), { type: 'beginDrag' })
+    h = reducer(h, { type: 'movePoint', index: 1, x: 0.4, y: 0.9, transient: true })
+    h = reducer(h, { type: 'movePoint', index: 1, x: 0.3, y: 0.8, transient: true })
+    expect(pts(h)[1]).toMatchObject({ x: 0.3, y: 0.8 })
+
+    h = reducer(h, { type: 'undo' })
+    expect(pts(h)[1]).toMatchObject({ x: 0.5, y: 1 })
+  })
+
+  it('does not record selection changes in the history', () => {
+    let h = reducer(start(), { type: 'select', index: 0 })
+    h = reducer(h, { type: 'undo' })
+
+    expect(h.past).toHaveLength(0)
+  })
+
+  it('adds, renames, recolours and deletes graphs, never removing the last one', () => {
+    let h = reducer(start(), { type: 'addGraph' })
+    expect(h.present.form.graphs).toHaveLength(2)
+    expect(h.present.active).toBe(1)
+
+    h = reducer(h, { type: 'renameGraph', index: 1, name: 'dimmer' })
+    h = reducer(h, { type: 'setGraphColor', index: 1, color: 'ff0000' })
+    expect(h.present.form.graphs[1]).toMatchObject({ name: 'dimmer', color: 'ff0000' })
+
+    h = reducer(h, { type: 'deleteGraph', index: 1 })
+    h = reducer(h, { type: 'deleteGraph', index: 0 })
+    expect(h.present.form.graphs).toHaveLength(1)
+    expect(h.present.active).toBe(0)
+  })
+
+  it('clears the name when renamed to blank, like an unnamed MA graph', () => {
+    const h = reducer(start(), { type: 'renameGraph', index: 0, name: '  ' })
+
+    expect(h.present.form.graphs[0].name).toBeUndefined()
+  })
+
+  it('loads a form as a fresh document', () => {
+    let h = reducer(start(), { type: 'addPoint', x: 0.8, y: 0.2 })
+    h = reducer(h, { type: 'load', form: form() })
+
+    expect(pts(h)).toHaveLength(2)
+    expect(h.present.selected).toBeNull()
+    expect(h.past).toHaveLength(0)
+  })
+})
