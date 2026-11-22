@@ -34,15 +34,27 @@ const JUMP_WIDTH = 0.002 + 1e-9
 
 type EndCondition = { clamp: number } | 'natural'
 
+/** One segment, from a point to the next (x0 may be followed by a wrap past x = 1). */
+interface Segment {
+  x0: number
+  width: number
+  y0: number
+  y1: number
+  mode: Mode
+  /** Spline slopes (dy/dx) at both ends; only for spline segments wider than a jump. */
+  m?: [number, number]
+}
+
 interface Compiled {
-  /** Spline tangents (dy/dx) at the start and end of each segment; null for non-spline segments. */
-  tangents: ([number, number] | null)[]
+  segments: Segment[]
   analysis: GraphAnalysis
 }
 
+/** Keyed by Graph identity: graphs are treated as immutable (the editor makes a new one per change). */
 const cache = new WeakMap<Graph, Compiled>()
 
 const isSplineMode = (m: Mode) => m === 'spline' || m === 'spline_break_start' || m === 'spline_break_end'
+const isBreakMode = (m: Mode) => m === 'spline_break_start' || m === 'spline_break_end'
 
 function compile(graph: Graph): Compiled {
   const cached = cache.get(graph)
@@ -50,26 +62,26 @@ function compile(graph: Graph): Compiled {
 
   const pts = graph.points
   const n = pts.length
-  const at = (k: number): Point => pts[((k % n) + n) % n]
+  const wrap = (k: number) => ((k % n) + n) % n
+  const at = (k: number): Point => pts[wrap(k)]
   const X = (k: number) => at(k).x + Math.floor(k / n)
   const width = (k: number) => X(k + 1) - X(k)
   const rise = (k: number) => at(k + 1).y - at(k).y
   const mode = (k: number) => at(k).mode
-  const isSpline = (k: number) => isSplineMode(mode(k)) && width(k) > JUMP_WIDTH
+  const isJump = (k: number) => width(k) <= JUMP_WIDTH
+  const isSpline = (k: number) => isSplineMode(mode(k)) && !isJump(k)
 
-  const tangents: ([number, number] | null)[] = Array.from({ length: n }, () => null)
+  const segments: Segment[] = pts.map((p, k) => ({ x0: p.x, width: width(k), y0: p.y, y1: at(k + 1).y, mode: p.mode }))
   const warnings: GraphWarning[] = []
   let approximate = false
 
   if (n >= 2) {
-    if (pts.some((_, k) => isSplineMode(mode(k)) && width(k) <= JUMP_WIDTH)) warnings.push('splineJump')
-
-    const hasBreak = pts.some((p) => p.mode === 'spline_break_start' || p.mode === 'spline_break_end')
+    if (pts.some((_, k) => isSplineMode(mode(k)) && isJump(k))) warnings.push('splineJump')
     const allSpline = pts.every((_, k) => isSpline(k))
 
-    if (allSpline && !hasBreak) {
-      const m = solvePeriodic(pts.map((_, k) => width(k)), pts.map((_, k) => rise(k)))
-      pts.forEach((_, k) => (tangents[k] = [m[k], m[(k + 1) % n]]))
+    if (allSpline && !pts.some((p) => isBreakMode(p.mode))) {
+      const m = solveSpline(segments.map((s) => s.width), pts.map((_, k) => rise(k)))
+      segments.forEach((s, k) => (s.m = [m[k], m[(k + 1) % n]]))
       approximate = true
     } else {
       if (allSpline && !breaksAlternate(pts.map((p) => p.mode))) warnings.push('unpairedBreak')
@@ -79,7 +91,7 @@ function compile(graph: Graph): Compiled {
 
       // A chain that runs into a non-spline segment takes its slope (a step is flat).
       const neighbourCondition = (k: number): EndCondition => {
-        if (width(k) <= JUMP_WIDTH) return 'natural'
+        if (isJump(k)) return 'natural'
         if (mode(k) === 'linear') return { clamp: rise(k) / width(k) }
         if (mode(k) === 'step_start' || mode(k) === 'step_end') return { clamp: 0 }
         return 'natural'
@@ -88,76 +100,61 @@ function compile(graph: Graph): Compiled {
       for (let k0 = 0; k0 < n; k0++) {
         if (!startsChain(k0)) continue
         const segs = [k0]
-        for (;;) {
-          const last = segs[segs.length - 1]
-          if (mode(last) === 'spline_break_end' || !isSpline(last + 1) || startsChain(last + 1) || segs.length >= n) break
-          segs.push(last + 1)
-        }
-        const last = segs[segs.length - 1]
+        // startsChain(next) also covers a chain ending at a break_end segment.
+        while (isSpline(segs.at(-1)! + 1) && !startsChain(segs.at(-1)! + 1) && segs.length < n) segs.push(segs.at(-1)! + 1)
+        const last = segs.at(-1)!
         const brokenStart = mode(k0) === 'spline_break_start' || mode(k0 - 1) === 'spline_break_end'
         const start: EndCondition = brokenStart ? 'natural' : neighbourCondition(k0 - 1)
         const end: EndCondition = mode(last) === 'spline_break_end' ? 'natural' : neighbourCondition(last + 1)
-        const m = solveOpen(segs.map(width), segs.map(rise), start, end)
-        segs.forEach((k, j) => (tangents[((k % n) + n) % n] = [m[j], m[j + 1]]))
+        const m = solveSpline(segs.map(width), segs.map(rise), [start, end])
+        segs.forEach((k, j) => (segments[wrap(k)].m = [m[j], m[j + 1]]))
       }
     }
   }
 
-  const compiled = { tangents, analysis: { approximate, warnings } }
+  const compiled = { segments, analysis: { approximate, warnings } }
   cache.set(graph, compiled)
   return compiled
 }
 
 /** Breaks, read around the cycle, must alternate start, end, start, end… */
 function breaksAlternate(modes: Mode[]): boolean {
-  const seq = modes.filter((m) => m === 'spline_break_start' || m === 'spline_break_end')
-  if (seq.length === 0) return true
-  if (seq.length % 2 === 1) return false
-  const first = seq.indexOf('spline_break_start')
-  if (first === -1) return false
-  const rotated = [...seq.slice(first), ...seq.slice(0, first)]
-  return rotated.every((m, i) => m === (i % 2 === 0 ? 'spline_break_start' : 'spline_break_end'))
+  const seq = modes.filter(isBreakMode)
+  return seq.every((m, i) => m !== seq[(i + 1) % seq.length])
 }
 
-/** Slopes of an open C2 cubic spline through consecutive segments (widths h, rises dy). */
-function solveOpen(h: number[], dy: number[], start: EndCondition, end: EndCondition): number[] {
-  const n = h.length + 1
+/**
+ * Slopes (dy/dx at each point) of a C2 cubic spline over segments with widths h
+ * and rises dy. Without ends the spline is closed (periodic, one slope per
+ * segment start); with ends it is open (one more slope than segments).
+ */
+function solveSpline(h: number[], dy: number[], ends?: [EndCondition, EndCondition]): number[] {
+  const segs = h.length
+  const n = ends ? segs + 1 : segs
   const s = dy.map((d, k) => d / h[k])
   const A = Array.from({ length: n }, () => new Array<number>(n).fill(0))
   const b = new Array<number>(n).fill(0)
-  for (let k = 1; k < n - 1; k++) {
-    A[k][k - 1] = h[k]
-    A[k][k] = 2 * (h[k - 1] + h[k])
-    A[k][k + 1] = h[k - 1]
-    b[k] = 3 * (h[k] * s[k - 1] + h[k - 1] * s[k])
-  }
-  const setEnd = (row: number, other: number, cond: EndCondition, slope: number) => {
-    if (cond === 'natural') {
-      A[row][row] = 2
-      A[row][other] = 1
-      b[row] = 3 * slope
-    } else {
-      A[row][row] = 1
-      b[row] = cond.clamp
-    }
-  }
-  setEnd(0, 1, start, s[0])
-  setEnd(n - 1, n - 2, end, s[n - 2])
-  return solveLinear(A, b)
-}
-
-/** Slopes of a closed (periodic) C2 cubic spline over n segments. */
-function solvePeriodic(h: number[], dy: number[]): number[] {
-  const n = h.length
-  const s = dy.map((d, k) => d / h[k])
-  const A = Array.from({ length: n }, () => new Array<number>(n).fill(0))
-  const b = new Array<number>(n).fill(0)
-  for (let k = 0; k < n; k++) {
-    const prev = (k - 1 + n) % n
-    A[k][prev] += h[k]
-    A[k][k] += 2 * (h[prev] + h[k])
+  for (let k = ends ? 1 : 0; k < (ends ? n - 1 : n); k++) {
+    const prev = (k - 1 + segs) % segs
+    const cur = k % segs
+    A[k][(k - 1 + n) % n] += h[cur]
+    A[k][k] += 2 * (h[prev] + h[cur])
     A[k][(k + 1) % n] += h[prev]
-    b[k] = 3 * (h[k] * s[prev] + h[prev] * s[k])
+    b[k] = 3 * (h[cur] * s[prev] + h[prev] * s[cur])
+  }
+  if (ends) {
+    const setEnd = (row: number, other: number, cond: EndCondition, slope: number) => {
+      if (cond === 'natural') {
+        A[row][row] = 2
+        A[row][other] = 1
+        b[row] = 3 * slope
+      } else {
+        A[row][row] = 1
+        b[row] = cond.clamp
+      }
+    }
+    setEnd(0, 1, ends[0], s[0])
+    setEnd(n - 1, n - 2, ends[1], s[segs - 1])
   }
   return solveLinear(A, b)
 }
@@ -212,24 +209,20 @@ export function evaluate(graph: Graph, t: number, side: 'right' | 'left' = 'righ
     u += 1
   }
 
-  const a = pts[i]
-  const b = pts[(i + 1) % n]
-  const width = b.x + (i + 1 === n ? 1 : 0) - a.x
-  if (width <= 0) return b.y
-  const f = (u - a.x) / width
+  const seg = compile(graph).segments[i]
+  if (seg.width <= 0) return seg.y1
+  const f = (u - seg.x0) / seg.width
 
-  switch (a.mode) {
+  switch (seg.mode) {
     case 'linear':
-      return a.y + (b.y - a.y) * f
+      return seg.y0 + (seg.y1 - seg.y0) * f
     case 'step_end':
-      return a.y
+      return seg.y0
     case 'step_start':
-      return b.y
-    default: {
-      const tg = compile(graph).tangents[i]
-      if (!tg) return a.y + (b.y - a.y) * f // zero-width spline segment: a jump
-      return hermite(a.y, b.y, tg[0] * width, tg[1] * width, f)
-    }
+      return seg.y1
+    default:
+      if (!seg.m) return seg.y0 + (seg.y1 - seg.y0) * f // zero-width spline segment: a jump
+      return hermite(seg.y0, seg.y1, seg.m[0] * seg.width, seg.m[1] * seg.width, f)
   }
 }
 
