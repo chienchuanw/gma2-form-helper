@@ -223,6 +223,13 @@ describe('fitStroke', () => {
       expect(maxError({ color: '', points: coarse }, ramp)).toBeLessThanOrEqual(0.055)
     })
 
+    it('does not start a step at the very end of the cycle, where it would have no width', () => {
+      // The settings of the browser session that showed it: precision 5, snap on.
+      const pts = fitStroke(stroke((x) => 0.1 + 0.8 * x, 0, 1, 200, 0), { tolerance: precisionToTolerance(5), mode: 'step', grid: { x: 0.125, y: 0.1 } })
+
+      expect(pts.some((p) => p.x >= 1)).toBe(false)
+    })
+
     it('keeps locked fits drawable in MA, with and without snapping (fuzz)', () => {
       let seed = 3
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
