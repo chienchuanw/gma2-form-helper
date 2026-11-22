@@ -106,7 +106,7 @@ export function serializeFormsXml(forms: Form[], opts: SerializeOptions = {}): s
     lines.push('\t</Form>')
   })
   lines.push('</MA>', '')
-  return lines.join('\r\n')
+  return lines.join('\n')
 }
 
 function esc(s: string): string {
