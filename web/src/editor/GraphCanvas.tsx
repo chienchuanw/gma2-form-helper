@@ -142,7 +142,7 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
         const down = toSvg(b.x, 0)[0]
         const up = toSvg(b.x + 1 / 8, 0)[0]
         return (
-          <g key={`beat${b.n}`}>
+          <g key={`beat${b.n}`} aria-hidden="true">
             <line className="beat-line downbeat" x1={down} x2={down} y1={PLOT.top} y2={PLOT.top + PLOT.height} />
             <line className="beat-line upbeat" x1={up} x2={up} y1={PLOT.top} y2={PLOT.top + PLOT.height} />
             <text className="beat-label downbeat" x={down + 6} y={PLOT.top + 16}>
