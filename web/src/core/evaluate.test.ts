@@ -99,12 +99,15 @@ describe('evaluate', () => {
 describe('evaluate next to vertical jumps', () => {
   it('does not overshoot a spline whose neighbour shares its x', () => {
     const s = g(p(0, 0, 'spline'), p(0.5, 1, 'spline'), p(0.5, 0, 'spline'), p(0.75, 0.5, 'spline'))
+    const near = g(p(0, 0, 'spline'), p(0.5, 1, 'spline'), p(0.502, 0, 'spline'), p(0.75, 0.5, 'spline'))
 
     for (let t = 0; t < 1; t += 0.005) {
       const v = evaluate(s, t)
-      // Without jump handling this reached about 1.22 / -0.22.
+      // Without jump handling the curve next to the jump reached about 1.22 / -0.22.
+      // (Plain Catmull-Rom overshoot on steep segments elsewhere is expected until #2.)
       expect(v).toBeGreaterThanOrEqual(-0.01)
       expect(v).toBeLessThanOrEqual(1.01)
+      expect(evaluate(near, t)).toBeLessThanOrEqual(1.01)
     }
   })
 })

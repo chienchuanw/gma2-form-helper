@@ -8,7 +8,7 @@ export function isExactMode(mode: Mode): boolean {
   return mode === 'linear'
 }
 
-/** Neighbouring points closer than this in x are a vertical jump, not a curve to follow. */
+/** Neighbouring points at most this far apart in x (0.2 on the 0–100 scale) are a vertical jump, not a curve to follow. */
 const JUMP_WIDTH = 0.002
 
 /**
@@ -56,8 +56,8 @@ export function evaluate(graph: Graph, t: number, side: 'right' | 'left' = 'righ
     default: {
       const secant = (by - ay) / width
       // A break, or a jump right next to the point, cuts the curve there: use the secant.
-      const breakA = mode === 'spline_break_start' || ax - xAt(i - 1) < JUMP_WIDTH
-      const breakB = mode === 'spline_break_end' || xAt(i + 2) - bx < JUMP_WIDTH
+      const breakA = mode === 'spline_break_start' || ax - xAt(i - 1) <= JUMP_WIDTH + 1e-9
+      const breakB = mode === 'spline_break_end' || xAt(i + 2) - bx <= JUMP_WIDTH + 1e-9
       const ma = breakA ? secant : slope(xAt(i - 1), yAt(i - 1), bx, by, secant)
       const mb = breakB ? secant : slope(ax, ay, xAt(i + 2), yAt(i + 2), secant)
       return hermite(ay, by, ma * width, mb * width, f)
