@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent } from 'react'
+import { useRef, useState, type PointerEvent } from 'react'
 import type { Form } from '../core/model'
 import { useStrings } from '../i18n'
 import { PLOT, VIEW_H, VIEW_W, curvePath, fromSvg, nearestPoint, snap, toSvg } from './geometry'
@@ -9,23 +9,29 @@ export interface SnapGrid {
   y: number
 }
 
+export type Tool = 'edit' | 'draw'
+
 interface Props {
   form: Form
   active: number
   selected: number | null
   grid: SnapGrid | null
+  tool: Tool
   dispatch: (a: Action) => void
+  /** A finished freehand stroke in 0–1 coordinates (draw tool). */
+  onStroke: (samples: { x: number; y: number }[]) => void
 }
 
 /** Grab radius in screen pixels, so points stay easy to hit on small screens. */
 const HIT_PX = 12
 const TICKS = Array.from({ length: 11 }, (_, i) => i / 10)
 
-export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
+export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onStroke }: Props) {
   const t = useStrings()
   const svgRef = useRef<SVGSVGElement>(null)
-  /** pointerId of the pointer dragging a point, or null. */
+  /** pointerId of the pointer dragging a point or drawing, or null. */
   const dragging = useRef<number | null>(null)
+  const [stroke, setStroke] = useState<[number, number][] | null>(null)
   const graph = form.graphs[active]
 
   const toView = (e: PointerEvent): [number, number] => {
@@ -43,6 +49,12 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
     const focused = document.activeElement
     if (focused instanceof HTMLInputElement) focused.blur()
     const [sx, sy] = toView(e)
+    if (tool === 'draw') {
+      dragging.current = e.pointerId
+      setStroke([fromSvg(sx, sy)])
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      return
+    }
     const width = svgRef.current!.getBoundingClientRect().width || VIEW_W
     const hit = nearestPoint(graph, sx, sy, Math.max(8, (HIT_PX * VIEW_W) / width))
     if (hit === null) {
@@ -58,6 +70,11 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
   // The reducer moves whichever point is selected, so fast moves never hit a stale index.
   const onPointerMove = (e: PointerEvent<SVGSVGElement>) => {
     if (dragging.current !== e.pointerId) return
+    if (tool === 'draw') {
+      const p = fromSvg(...toView(e))
+      setStroke((s) => (s ? [...s, p] : [p]))
+      return
+    }
     const [x, y] = snapped(...toView(e))
     dispatch({ type: 'dragTo', x, y })
   }
@@ -65,6 +82,11 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
   const endDrag = (e: PointerEvent<SVGSVGElement>) => {
     if (dragging.current !== e.pointerId) return
     dragging.current = null
+    if (tool === 'draw') {
+      if (stroke) onStroke(stroke.map(([x, y]) => ({ x, y })))
+      setStroke(null)
+      return
+    }
     dispatch({ type: 'endDrag' })
   }
 
@@ -75,7 +97,7 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
   return (
     <svg
       ref={svgRef}
-      className="graph"
+      className={tool === 'draw' ? 'graph drawing' : 'graph'}
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
       role="application"
       aria-label={t.canvasLabel}
@@ -118,6 +140,12 @@ export function GraphCanvas({ form, active, selected, grid, dispatch }: Props) {
         )}
         <path className="curve active" d={curvePath(graph)} stroke={`#${graph.color}`} />
       </g>
+      {stroke && (
+        <polyline
+          className="stroke"
+          points={stroke.map(([x, y]) => toSvg(x, y).map((v) => v.toFixed(1)).join(',')).join(' ')}
+        />
+      )}
       {graph.points.map((p, i) => {
         const [cx, cy] = toSvg(p.x, p.y)
         return <circle key={i} className={i === selected ? 'point selected' : 'point'} cx={cx} cy={cy} r={i === selected ? 8 : 6} />

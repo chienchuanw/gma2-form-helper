@@ -253,6 +253,42 @@ label.inline select {
   opacity: 0.35;
 }
 
+.graph.drawing {
+  cursor: cell;
+}
+
+.stroke {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.8;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border: none;
+  border-radius: 0;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+input[type='range'] {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
 .point {
   fill: var(--point);
   stroke: #0b0c0e;

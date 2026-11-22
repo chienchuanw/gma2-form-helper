@@ -1,10 +1,11 @@
 import { useEffect, useReducer, useRef, useState, type ChangeEvent } from 'react'
 import { analyzeGraph } from './core/evaluate'
+import { fitStroke, precisionToTolerance } from './core/fit'
 import type { Form } from './core/model'
 import { tableText } from './core/table'
 import { DEFAULT_VERSION, exportFileName, parseFormsXml, serializeFormsXml } from './core/xml'
 import { FormPicker } from './editor/FormPicker'
-import { GraphCanvas, type SnapGrid } from './editor/GraphCanvas'
+import { GraphCanvas, type SnapGrid, type Tool } from './editor/GraphCanvas'
 import { GraphTabs } from './editor/GraphTabs'
 import { ModeSelect } from './editor/ModeSelect'
 import { PointTable } from './editor/PointTable'
@@ -19,6 +20,10 @@ export default function App() {
   const [lang, setLang] = useState<Lang>(() => detectLang(navigator.languages ?? []))
   const [history, dispatch] = useReducer(reducer, undefined, initialState)
   const [snapOn, setSnapOn] = useState(true)
+  const [tool, setTool] = useState<Tool>('edit')
+  const [precision, setPrecision] = useState(5)
+  /** The last freehand stroke, so the precision slider can re-fit it. */
+  const lastStroke = useRef<{ id: number; samples: { x: number; y: number }[] } | null>(null)
   const [version, setVersion] = useState(DEFAULT_VERSION)
   const [choices, setChoices] = useState<Form[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +69,26 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  const fitInto = (id: number, samples: { x: number; y: number }[], p: number) => {
+    const points = fitStroke(samples, { tolerance: precisionToTolerance(p), grid: snapOn ? SNAP : null })
+    if (points.length === 0) return
+    const xs = samples.map((s) => s.x)
+    dispatch({ type: 'drawStroke', stroke: id, from: Math.min(...xs), to: Math.max(...xs), points })
+  }
+
+  const onStroke = (samples: { x: number; y: number }[]) => {
+    const id = (lastStroke.current?.id ?? 0) + 1
+    lastStroke.current = { id, samples }
+    fitInto(id, samples, precision)
+  }
+
+  const onPrecision = (p: number) => {
+    setPrecision(p)
+    // Re-fit only while the stroke is still the latest edit.
+    const last = lastStroke.current
+    if (last && history.lastKind === `stroke:${last.id}`) fitInto(last.id, last.samples, p)
+  }
 
   const onImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -151,6 +176,18 @@ export default function App() {
       <main className="workspace">
         <section className="editor">
           <div className="toolbar">
+            <div className="segmented" role="group" aria-label={t.tool}>
+              <button type="button" aria-pressed={tool === 'edit'} onClick={() => setTool('edit')}>
+                {t.toolEdit}
+              </button>
+              <button type="button" aria-pressed={tool === 'draw'} onClick={() => setTool('draw')}>
+                {t.toolDraw}
+              </button>
+            </div>
+            <label className="inline" title={t.precisionHelp}>
+              {t.precision}
+              <input type="range" min={1} max={10} step={1} value={precision} onChange={(e) => onPrecision(Number(e.target.value))} />
+            </label>
             <button type="button" disabled={history.past.length === 0} onClick={() => dispatch({ type: 'undo' })}>
               {t.undo}
             </button>
@@ -171,8 +208,16 @@ export default function App() {
               />
             </label>
           </div>
-          <GraphCanvas form={form} active={active} selected={selected} grid={snapOn ? SNAP : null} dispatch={dispatch} />
-          <p className="muted hint">{t.canvasHint}</p>
+          <GraphCanvas
+            form={form}
+            active={active}
+            selected={selected}
+            grid={snapOn ? SNAP : null}
+            tool={tool}
+            dispatch={dispatch}
+            onStroke={onStroke}
+          />
+          <p className="muted hint">{tool === 'draw' ? t.drawHint : t.canvasHint}</p>
           <GraphTabs form={form} active={active} dispatch={dispatch} />
           <div role="status" className="notices">
             {analysis.approximate && <p className="notice">{t.approximate}</p>}
