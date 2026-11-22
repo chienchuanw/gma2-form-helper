@@ -167,15 +167,18 @@ function Start()
 
     -- 1. Which drive. The internal drive can be checked before importing; a USB
     --    stick appears as another drive number (see the SelectDrive list).
-    local drive_in = call1(gma.textinput, "Drive: 1 = internal, USB = its number in SelectDrive", "1")
+    local drive_in = call1(gma.textinput, "Drive (1 = internal)", "1")
     if drive_in == nil then return end
     local drive = M.parse_slot(drive_in)
-    if not drive then return fail("Not a drive number: " .. tostring(drive_in)) end
+    if not drive then
+        return fail("Not a drive number: " .. tostring(drive_in) ..
+            "\n\nType SelectDrive in the command line to see the drive numbers;\na USB stick is listed there once it is plugged in.")
+    end
     local internal = drive == 1
 
     -- 2. Which file. Default: the newest fh_*.xml in the internal importexport.
     local default = (internal and dir and newest_file(dir, os_name)) or "fh_"
-    local file = M.xml_name(call1(gma.textinput, "Form file in importexport (from Form Helper)", default))
+    local file = M.xml_name(call1(gma.textinput, "Form file (importexport)", default))
     if not file then return note("cancelled") end
 
     local forms
@@ -191,7 +194,7 @@ function Start()
 
     -- 3. Which slot. Default: the first empty one.
     local suggestion = M.first_empty(function(n) return form_handle(n) ~= nil end, 1, MAX_FORM)
-    local slot = M.parse_slot(call1(gma.textinput, "Import into Form number", tostring(suggestion or "")))
+    local slot = M.parse_slot(call1(gma.textinput, "Import into Form", tostring(suggestion or "")))
     if not slot then return note("cancelled") end
 
     -- 4. Never replace a Form without asking.
