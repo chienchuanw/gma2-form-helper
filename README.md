@@ -101,11 +101,12 @@ lua plugin/tests/test_logic.lua
 ./scripts/build-plugin.sh          # -> dist/form-helper-import.zip
 ```
 
-Deploy (Vercel project `gma2-form-helper` in the Take Two Studio team, built
-from `web/`):
+Deploy: the Vercel project `gma2-form-helper` (Take Two Studio team) is
+connected to this repository with Root Directory `web`. Pushing to `main`
+deploys production; other branches get preview deployments. A manual deploy
+runs from the repo root:
 
 ```sh
-cd web
 vercel link --scope take-two-studio --project gma2-form-helper   # once per clone
 vercel deploy --prod --scope take-two-studio
 ```
