@@ -87,7 +87,11 @@
 - 匯入時，同一個 X 的多個點會保持檔案裡的順序。
 - 透過 Telnet 可以列出點：`cd Form 101`、`cd 1`、`List`，會顯示 X / Y / Mode 的表格。可以用來在測試中驗證匯入結果。
 
-### 3.4 尚未查證（實作時先驗證）
+### 3.4 曲線校正結果
+
+已在 #2 校正完成，規則與誤差見 `docs/ma2-form-modes.md`。重點：Linear、Step 完全精確；Spline 是以「chain」為單位的 C2 三次樣條，接 Linear/Step 時沿用鄰段斜率，Break 是成對使用的 chain 邊界；只有「整條都是 Spline、沒有 Break」的封閉曲線是近似（RMS 0.2–2.7）。
+
+### 3.4.1 原本列為未查證的項目
 
 - **每種 Mode 的精確插值公式**，特別是 Spline、Spline Break 和兩種 Step 的語意（Step Start 是在段落開頭跳變，還是取下一點的值等）。
 - 在 X=0 與 X=100 交界處，循環時的插值方式。
