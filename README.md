@@ -17,10 +17,16 @@ see below).
 - **Edit points**: click to add, drag to move, pick each segment's Mode
   (Linear, Spline, Spline (Break at Start/End), Step (Start/End)), with an
   optional snap grid (X every 12.5, Y every 10), undo/redo and keyboard nudging.
-- **Draw**: sketch a stroke and it becomes a few clean points with automatically
-  chosen modes. Straight runs become Linear, curves become Spline, and a flat run
-  ending in a jump becomes a single Step (End) point. A Precision slider trades
-  point count against closeness and re-fits the last stroke in place.
+- **Draw**: sketch a stroke and it becomes a few clean points. A stroke
+  replaces only the points in the span it covers and joins the points around
+  it, so you can redraw part of a graph. A Precision slider trades point count
+  against closeness and re-fits the last stroke in place.
+- **Draw mode**: *Auto* picks a mode per segment (straight runs become Linear,
+  curves become Spline, a flat run ending in a jump becomes a single
+  Step (End) point). *Linear*, *Spline* or *Step (End)* makes the whole stroke
+  use that one mode.
+- **Beat guides**: one cycle of the Form is one bar, so the canvas marks beats
+  1 to 4 and the upbeats (&) between them to help place hits on the music.
 - **Several graphs per Form**, one tab each like MA's Table Mode, with names and
   colours; the other graphs show faintly behind the active one.
 - **Table Mode values** formatted exactly as MA shows them (0–100, two decimals),
@@ -119,3 +125,6 @@ vercel deploy --prod --scope take-two-studio
       `gma2/importexport`, MA's own overwrite question) — cannot be simulated on onPC
 - [ ] Plugin zip attached to the GitHub release
 
+## License
+
+The project does not specify a license yet.
