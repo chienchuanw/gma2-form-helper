@@ -2,6 +2,17 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "gma2-form-helper.vercel.app"
+        }
+      ],
+      "permanent": true,
+      "destination": "https://gma2.chienchuanw.com/form"
+    },
+    {
       "source": "/form/:path*",
       "has": [
         {
