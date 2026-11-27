@@ -1,11 +1,14 @@
 import json
 import random
 import socket
+import sys
 import tempfile
 import threading
 import time
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))  # runnable from the repo root too
 
 from artnet_capture import HEADER, analyze, artdmx_packet, capture, main, parse_artdmx, parse_channels
 
