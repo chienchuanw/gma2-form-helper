@@ -20,6 +20,10 @@ describe('deploy config', () => {
     ])
   })
 
+  it('serves /form/* from the root when reached without the hub, so previews and the origin still load their assets', () => {
+    expect(vercel.rewrites).toEqual([{ source: '/form/:path*', destination: '/:path*' }])
+  })
+
   it('labels the hub link in both languages', () => {
     expect(STRINGS.en.hubLink).toBe('gma2 tools')
     expect(STRINGS['zh-TW'].hubLink).toBe('gma2 工具')
