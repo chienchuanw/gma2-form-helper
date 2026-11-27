@@ -16,10 +16,10 @@ import { usePlayback } from './editor/usePlayback'
 import { LangContext, STRINGS, detectLang, type Lang } from './i18n'
 
 /** Versions whose import has been verified on a console or onPC. */
-// Absolute on purpose: on the origin hostname a relative "/" would not reach the hub.
-const HUB_URL = 'https://gma2.chienchuanw.com/'
 const VERSIONS = [DEFAULT_VERSION]
 const SNAP: SnapGrid = { x: 0.125, y: 0.1 }
+/** Absolute on purpose: on the origin hostname a relative "/" would not reach the hub. */
+const HUB_URL = 'https://gma2.chienchuanw.com/'
 
 export default function App() {
   const [lang, setLang] = useState<Lang>(() => detectLang(navigator.languages ?? []))

@@ -180,6 +180,7 @@ input[type='color'] {
 
 .hub-link {
   color: var(--muted);
+  white-space: nowrap;
   font-size: 0.875rem;
   text-decoration: none;
 }
