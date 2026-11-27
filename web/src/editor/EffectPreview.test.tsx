@@ -85,15 +85,20 @@ describe('Effect preview', () => {
     expect(levels()).toEqual([0, 13, 25, 38, 50, 38, 25, 13])
   })
 
-  it('follows the graph tab that is active', async () => {
+  it('follows the graph tab that is active, also while playing', async () => {
     const user = userEvent.setup()
     render(<App />)
+    await user.click(panel().getByRole('button', { name: 'Play' }))
+    frame(0)
 
     await user.click(screen.getByRole('button', { name: /Add graph/ })) // a new graph is flat at 0
+    frame(0)
     expect(levels()).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
 
     await user.click(screen.getAllByRole('tab')[0])
+    frame(0)
     expect(levels()).toEqual([0, 25, 50, 75, 100, 75, 50, 25])
+    expect(panel().getByRole('button', { name: 'Pause' })).toBeInTheDocument()
   })
 
   it('maps the graph between Low and High', async () => {
@@ -106,14 +111,19 @@ describe('Effect preview', () => {
     expect(levels()).toEqual([20, 35, 50, 65, 80, 65, 50, 35])
   })
 
-  it('applies a phase preset', async () => {
+  it('runs the wave the other way with the 0 to 360 preset', async () => {
     const user = userEvent.setup()
     render(<App />)
+    // Lopsided graph (peak at X 25), so the two directions light the row differently.
+    const x2 = within(screen.getByRole('table', { name: 'Points' })).getByLabelText('X 2')
+    await user.clear(x2)
+    await user.type(x2, '25{Enter}')
+    expect(levels()).toEqual([0, 17, 33, 50, 67, 83, 100, 50]) // 0 to -360: fixture i reads X = 1 - i/8
 
     await user.click(panel().getByRole('button', { name: 'Phase 0 to 360' }))
 
     expect(panel().getByLabelText('Phase to')).toHaveValue(360)
-    expect(levels()).toEqual([0, 25, 50, 75, 100, 75, 50, 25].map((_, i, a) => a[(8 - i) % 8]))
+    expect(levels()).toEqual([0, 50, 100, 83, 67, 50, 33, 17]) // fixture i reads X = i/8
   })
 
   it('adds and removes fixtures within 1 to 32', async () => {
