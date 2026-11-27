@@ -86,6 +86,7 @@ pair to bound a chain.
 web/      React + TypeScript + Vite app (core engine in web/src/core)
 plugin/   grandMA2 Lua plugin + logic tests
 tools/    ma2lab.py: drive an onPC test machine over telnet/ssh
+          artnet_capture.py: record MA's Art-Net output to measure effects
 docs/     design, calibration findings
 ```
 
@@ -107,6 +108,17 @@ replaces Form 120 there:
 
 ```sh
 MA2_LAB=1 MA2_HOST=<ip> npm test   # see tools/ma2lab.py for the other settings
+```
+
+To check the effect preview's timing against MA, run an effect on 8 dimmers in
+the lab show with Art-Net output on, then record and measure it (see the header
+of `tools/artnet_capture.py` for the onPC setup). It prints the cycle length and
+how far each channel runs behind the first, in MA's phase convention:
+
+```sh
+python3 tools/artnet_capture.py capture --channels 1-8 --seconds 20 --out capture.json
+python3 tools/artnet_capture.py analyze capture.json
+cd tools && python3 -m unittest   # tool tests, no console needed
 ```
 
 Plugin:
