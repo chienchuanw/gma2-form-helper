@@ -80,11 +80,14 @@ export function EffectPreview({ graph, settings, onChange, playback }: Props) {
           {field(t.phaseStart, 'phaseStart', LIMITS.phase)}
           <span aria-hidden="true">→</span>
           {field(t.phaseEnd, 'phaseEnd', LIMITS.phase)}
-          {PHASE_PRESETS.map(([from, to]) => (
-            <button key={`${from}${to}`} type="button" className="icon" aria-label={t.phasePreset(fmt(from), fmt(to))} onClick={() => set({ phaseStart: from, phaseEnd: to })}>
-              {from === to ? show(from) : `${show(from)} → ${show(to)}`}
-            </button>
-          ))}
+          {PHASE_PRESETS.map(([from, to]) => {
+            const label = from === to ? show(from) : `${show(from)} → ${show(to)}`
+            return (
+              <button key={label} type="button" className="icon" aria-label={`${t.phase} ${label}`} onClick={() => set({ phaseStart: from, phaseEnd: to })}>
+                {label}
+              </button>
+            )
+          })}
         </span>
         <label className="inline">
           {t.low}

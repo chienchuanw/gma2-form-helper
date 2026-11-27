@@ -1,4 +1,4 @@
-import type { FocusEvent, KeyboardEvent } from 'react'
+import { useEffect, useRef, type FocusEvent, type KeyboardEvent } from 'react'
 
 interface Props {
   label: string
@@ -15,9 +15,15 @@ interface Props {
 /**
  * A number input that commits on Enter or blur. The field then shows what was
  * committed (clamped and normalized), or the old value back if the input was
- * not a number. It re-mounts when value changes from outside.
+ * not a number. A new value from outside replaces the text without
+ * re-mounting, so the field keeps focus after Enter.
  */
 export function NumberField({ label, value, min, max, step = 'any', className, normalize = (v) => v, onCommit }: Props) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (ref.current) ref.current.value = String(value)
+  }, [value])
+
   const commit = (e: FocusEvent<HTMLInputElement> | KeyboardEvent<HTMLInputElement>) => {
     if ('key' in e && e.key !== 'Enter') return
     const input = e.currentTarget
@@ -32,7 +38,7 @@ export function NumberField({ label, value, min, max, step = 'any', className, n
   }
   return (
     <input
-      key={value}
+      ref={ref}
       type="number"
       className={className}
       aria-label={label}
