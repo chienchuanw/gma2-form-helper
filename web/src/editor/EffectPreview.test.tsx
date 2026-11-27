@@ -85,6 +85,17 @@ describe('Effect preview', () => {
     expect(levels()).toEqual([0, 13, 25, 38, 50, 38, 25, 13])
   })
 
+  it('follows the graph tab that is active', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /Add graph/ })) // a new graph is flat at 0
+    expect(levels()).toEqual([0, 0, 0, 0, 0, 0, 0, 0])
+
+    await user.click(screen.getAllByRole('tab')[0])
+    expect(levels()).toEqual([0, 25, 50, 75, 100, 75, 50, 25])
+  })
+
   it('maps the graph between Low and High', async () => {
     const user = userEvent.setup()
     render(<App />)
