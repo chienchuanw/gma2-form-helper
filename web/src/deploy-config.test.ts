@@ -15,6 +15,9 @@ describe('deploy config', () => {
 
   it('redirects the legacy host to the hub, matching /form paths first so the prefix is not doubled', () => {
     expect(vercel.redirects).toEqual([
+      // Vercel serves a static root index.html without applying the /:path* catch-all, so the
+      // root needs its own rule.
+      { source: '/', has: LEGACY_HOST, permanent: true, destination: 'https://gma2.chienchuanw.com/form' },
       { source: '/form/:path*', has: LEGACY_HOST, permanent: true, destination: HUB_FORM },
       { source: '/:path*', has: LEGACY_HOST, permanent: true, destination: HUB_FORM },
     ])
