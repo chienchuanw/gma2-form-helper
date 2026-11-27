@@ -2,6 +2,8 @@ import json
 import random
 import socket
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -153,6 +155,32 @@ class CaptureTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_capture_writes_the_samples_to_a_json_file(self):
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+
+        def send():
+            sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            for level in range(20):
+                sender.sendto(artdmx_packet(universe=0, data=bytes([level, 0])), ("127.0.0.1", port))
+                time.sleep(0.02)
+            sender.close()
+
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "capture.json"
+            threading.Timer(0.1, send).start()
+            out = []
+            code = main(["capture", "--bind", "127.0.0.1", "--port", str(port), "--channels", "1", "--seconds", "0.8", "--out", str(path)], out=out.append)
+            data = json.loads(path.read_text())
+
+        self.assertEqual(code, 0)
+        self.assertEqual((data["universe"], data["channels"]), (0, [1]))
+        self.assertGreater(len(data["samples"]), 10)
+        self.assertEqual([s[1] for s in data["samples"]], sorted(s[1] for s in data["samples"]))
+        self.assertIn("packets from universe 0", out[0])
+
     def test_analyze_prints_cycle_and_phases_from_a_capture_file(self):
         text = run_analyze(synthetic(lopsided, period=2.0, lags=[0, 0.125], seconds=16), channels=[1, 2])
 
