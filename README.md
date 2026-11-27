@@ -127,4 +127,4 @@ vercel deploy --prod --scope take-two-studio
 
 ## License
 
-The project does not specify a license yet.
+[MIT](LICENSE) © 2026 chienchuanw
