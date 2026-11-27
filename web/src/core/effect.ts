@@ -27,7 +27,22 @@ export interface PreviewSettings extends EffectParams {
 /** 8 fixtures half a beat apart (MA's default Phase 0 Thru −360) at 120 BPM over the full range. */
 export const DEFAULT_PREVIEW: PreviewSettings = { count: 8, bpm: 120, phaseStart: 0, phaseEnd: -360, low: 0, high: 100 }
 
-export interface FixtureState {
+/** Allowed [min, max] of each setting. Phase follows MA's range. */
+export const LIMITS = {
+  count: [1, 32],
+  bpm: [20, 300],
+  phase: [-2880, 2880],
+  level: [0, 100],
+} as const
+
+/** MA's phase presets [start, end]: forwards, backwards, all in sync. */
+export const PHASE_PRESETS: readonly (readonly [number, number])[] = [
+  [0, -360],
+  [0, 360],
+  [0, 0],
+]
+
+interface FixtureState {
   /** Phase in degrees. */
   phase: number
   /** Where this fixture is on the Form, 0–1. */
@@ -63,16 +78,12 @@ function positionOf(pos: number, phase: number): number {
   return wrap(pos + phase / 360)
 }
 
+/** Output level 0–100: Low + (High − Low) · value, clamped (a Spline may overshoot). */
 function level(value: number, low: number, high: number): number {
   return Math.min(100, Math.max(0, low + (high - low) * value))
 }
 
-/** Output level (0–100) of a fixture with this phase at bar position pos (cycles, any real number). */
-export function levelAt(graph: Graph, pos: number, phase: number, low: number, high: number): number {
-  return level(evaluate(graph, positionOf(pos, phase)), low, high)
-}
-
-/** Every fixture's state at bar position pos. */
+/** Every fixture's state at bar position pos (cycles, any real number). */
 export function fixtureFrame(graph: Graph, pos: number, p: EffectParams): FixtureState[] {
   return Array.from({ length: p.count }, (_, i) => {
     const phase = phaseFor(i, p.count, p.phaseStart, p.phaseEnd)

@@ -1,8 +1,8 @@
-import { type KeyboardEvent, type FocusEvent } from 'react'
 import { roundTyped, type Graph } from '../core/model'
 import { formatCoord } from '../core/table'
 import { useStrings } from '../i18n'
 import { ModeSelect } from './ModeSelect'
+import { NumberField } from './NumberField'
 import type { Action } from './state'
 
 interface Props {
@@ -15,21 +15,8 @@ interface Props {
 export function PointTable({ graph, selected, dispatch }: Props) {
   const t = useStrings()
 
-  const shown = (v: number) => String(Number(formatCoord(v)))
-
-  // Commit on Enter or blur; the field then shows what was stored (clamped and
-  // rounded), or the old value back if the input was not a number.
-  const commit = (index: number, axis: 'x' | 'y') => (e: FocusEvent<HTMLInputElement> | KeyboardEvent<HTMLInputElement>) => {
-    if ('key' in e && e.key !== 'Enter') return
-    const input = e.currentTarget
-    const v = Number(input.value)
-    if (input.value.trim() === '' || !Number.isFinite(v)) {
-      input.value = shown(graph.points[index][axis])
-      return
-    }
-    input.value = shown(roundTyped(v / 100))
-    dispatch({ type: 'setPoint', index, [axis]: v / 100 })
-  }
+  /** A 0–1 coordinate as MA's Table Mode shows it (0–100, two decimals). */
+  const shown = (v: number) => Number(formatCoord(v))
 
   return (
     <table className="points" aria-label={t.points}>
@@ -50,16 +37,14 @@ export function PointTable({ graph, selected, dispatch }: Props) {
             <td className="num">{i + 1}</td>
             {(['x', 'y'] as const).map((axis) => (
               <td key={axis}>
-                <input
-                  key={p[axis]}
-                  type="number"
+                <NumberField
+                  label={`${axis.toUpperCase()} ${i + 1}`}
+                  value={shown(p[axis])}
                   min={0}
                   max={100}
                   step={0.01}
-                  aria-label={`${axis.toUpperCase()} ${i + 1}`}
-                  defaultValue={Number(formatCoord(p[axis]))}
-                  onBlur={commit(i, axis)}
-                  onKeyDown={commit(i, axis)}
+                  normalize={(v) => shown(roundTyped(v / 100))}
+                  onCommit={(v) => dispatch({ type: 'setPoint', index: i, [axis]: v / 100 })}
                 />
               </td>
             ))}

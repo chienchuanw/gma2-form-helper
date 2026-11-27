@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cycleSeconds, fixtureFrame, levelAt, maEffectSpeed, phaseFor } from './effect'
+import { cycleSeconds, fixtureFrame, maEffectSpeed, phaseFor } from './effect'
 import { sampleGraph } from './evaluate'
 import type { Graph } from './model'
 
@@ -11,6 +11,10 @@ const triangle: Graph = {
     { x: 0.5, y: 1, mode: 'linear' },
   ],
 }
+
+/** Level of a single fixture with this phase. */
+const levelAt = (graph: Graph, pos: number, phase: number, low: number, high: number) =>
+  fixtureFrame(graph, pos, { count: 1, phaseStart: phase, phaseEnd: phase, low, high })[0].level
 
 describe('phaseFor', () => {
   it('spreads start to end evenly so the last fixture stops one step short of the end', () => {
@@ -38,7 +42,7 @@ describe('speed', () => {
   })
 })
 
-describe('levelAt', () => {
+describe('fixture level', () => {
   it('reads the graph at the bar position on a 0–100 scale', () => {
     expect(levelAt(triangle, 0.25, 0, 0, 100)).toBeCloseTo(50)
     expect(levelAt(triangle, 0.5, 0, 0, 100)).toBeCloseTo(100)

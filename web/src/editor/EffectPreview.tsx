@@ -1,21 +1,10 @@
-import { useRef, type FocusEvent, type KeyboardEvent } from 'react'
-import { fixtureFrame, maEffectSpeed, type PreviewSettings } from '../core/effect'
+import { useRef } from 'react'
+import { LIMITS, PHASE_PRESETS, fixtureFrame, maEffectSpeed, type EffectParams, type PreviewSettings } from '../core/effect'
 import type { Graph } from '../core/model'
 import { useStrings } from '../i18n'
+import { PLOT, toSvg } from './geometry'
+import { NumberField } from './NumberField'
 import { useFrame, type Playback } from './usePlayback'
-
-const LIMITS = {
-  count: [1, 32],
-  bpm: [20, 300],
-  phase: [-2880, 2880], // MA's phase range
-  level: [0, 100],
-} as const
-
-const PRESETS: [number, number][] = [
-  [0, -360],
-  [0, 360],
-  [0, 0],
-]
 
 /** Up to two decimals, without trailing zeros; minus signs as typed. */
 const fmt = (v: number) => String(Math.round(v * 100) / 100)
@@ -41,9 +30,23 @@ export function EffectPreview({ graph, settings, onChange, playback }: Props) {
       const el = fixtures.current[i]
       if (!el) return
       el.style.setProperty('--level', (f.level / 100).toFixed(3))
-      el.title = t.fixtureTitle(i + 1, show(f.phase), String(Math.round(f.level)))
+      // The tooltip only matters when the strip holds still.
+      if (!playback.playing) el.title = t.fixtureTitle(i + 1, show(f.phase), String(Math.round(f.level)))
     })
   })
+
+  const field = (label: string, key: keyof PreviewSettings, limits: readonly [number, number], integer = false) => (
+    <NumberField
+      label={label}
+      className="num-field"
+      value={settings[key]}
+      min={limits[0]}
+      max={limits[1]}
+      step={integer ? 1 : 'any'}
+      normalize={integer ? Math.round : undefined}
+      onCommit={(v) => set({ [key]: v })}
+    />
+  )
 
   return (
     <section className="preview" aria-labelledby="preview-title">
@@ -58,14 +61,14 @@ export function EffectPreview({ graph, settings, onChange, playback }: Props) {
         </button>
         <label className="inline">
           {t.tempo}
-          <NumberField label={t.tempo} value={settings.bpm} limits={LIMITS.bpm} onCommit={(bpm) => set({ bpm })} />
+          {field(t.tempo, 'bpm', LIMITS.bpm)}
         </label>
         <span className="inline">
           {t.fixtures}
           <button type="button" className="icon" aria-label={t.fewerFixtures} title={t.fewerFixtures} disabled={count <= LIMITS.count[0]} onClick={() => set({ count: count - 1 })}>
             −
           </button>
-          <NumberField label={t.fixtures} value={count} limits={LIMITS.count} integer onCommit={(c) => set({ count: c })} />
+          {field(t.fixtures, 'count', LIMITS.count, true)}
           <button type="button" className="icon" aria-label={t.moreFixtures} title={t.moreFixtures} disabled={count >= LIMITS.count[1]} onClick={() => set({ count: count + 1 })}>
             +
           </button>
@@ -74,10 +77,10 @@ export function EffectPreview({ graph, settings, onChange, playback }: Props) {
       <div className="toolbar">
         <span className="inline">
           {t.phase}
-          <NumberField label={t.phaseStart} value={settings.phaseStart} limits={LIMITS.phase} onCommit={(phaseStart) => set({ phaseStart })} />
+          {field(t.phaseStart, 'phaseStart', LIMITS.phase)}
           <span aria-hidden="true">→</span>
-          <NumberField label={t.phaseEnd} value={settings.phaseEnd} limits={LIMITS.phase} onCommit={(phaseEnd) => set({ phaseEnd })} />
-          {PRESETS.map(([from, to]) => (
+          {field(t.phaseEnd, 'phaseEnd', LIMITS.phase)}
+          {PHASE_PRESETS.map(([from, to]) => (
             <button key={`${from}${to}`} type="button" className="icon" aria-label={t.phasePreset(fmt(from), fmt(to))} onClick={() => set({ phaseStart: from, phaseEnd: to })}>
               {from === to ? show(from) : `${show(from)} → ${show(to)}`}
             </button>
@@ -85,11 +88,11 @@ export function EffectPreview({ graph, settings, onChange, playback }: Props) {
         </span>
         <label className="inline">
           {t.low}
-          <NumberField label={t.low} value={settings.low} limits={LIMITS.level} onCommit={(low) => set({ low })} />
+          {field(t.low, 'low', LIMITS.level)}
         </label>
         <label className="inline">
           {t.high}
-          <NumberField label={t.high} value={settings.high} limits={LIMITS.level} onCommit={(high) => set({ high })} />
+          {field(t.high, 'high', LIMITS.level)}
         </label>
       </div>
       <div className="fixtures" aria-hidden="true">
@@ -108,40 +111,37 @@ export function EffectPreview({ graph, settings, onChange, playback }: Props) {
   )
 }
 
-interface FieldProps {
-  label: string
-  value: number
-  limits: readonly [number, number]
-  integer?: boolean
-  onCommit: (v: number) => void
+interface MarksProps {
+  graph: Graph
+  params: EffectParams
+  playback: Playback
 }
 
-/** A number input that commits on Enter or blur, clamped; a non-number puts the old value back. */
-function NumberField({ label, value, limits: [min, max], integer, onCommit }: FieldProps) {
-  const commit = (e: FocusEvent<HTMLInputElement> | KeyboardEvent<HTMLInputElement>) => {
-    if ('key' in e && e.key !== 'Enter') return
-    const input = e.currentTarget
-    const v = Number(input.value)
-    if (input.value.trim() === '' || !Number.isFinite(v)) {
-      input.value = String(value)
-      return
-    }
-    const next = Math.min(max, Math.max(min, integer ? Math.round(v) : v))
-    input.value = String(next)
-    if (next !== value) onCommit(next)
-  }
+/** For GraphCanvas: a playhead at fixture 1 and a dot per fixture where it is on the curve. */
+export function PreviewMarks({ graph, params, playback }: MarksProps) {
+  const playhead = useRef<SVGLineElement>(null)
+  const dots = useRef<(SVGCircleElement | null)[]>([])
+
+  useFrame(playback, (pos) => {
+    fixtureFrame(graph, pos, params).forEach((f, i) => {
+      const [cx, cy] = toSvg(f.x, f.value)
+      if (i === 0) {
+        playhead.current?.setAttribute('x1', cx.toFixed(1))
+        playhead.current?.setAttribute('x2', cx.toFixed(1))
+      }
+      dots.current[i]?.setAttribute('cx', cx.toFixed(1))
+      dots.current[i]?.setAttribute('cy', cy.toFixed(1))
+    })
+  })
+
   return (
-    <input
-      key={value}
-      type="number"
-      className="num-field"
-      aria-label={label}
-      min={min}
-      max={max}
-      step={integer ? 1 : 'any'}
-      defaultValue={value}
-      onBlur={commit}
-      onKeyDown={commit}
-    />
+    <g className="preview-marks" aria-hidden="true">
+      <line ref={playhead} className="playhead" y1={PLOT.top} y2={PLOT.top + PLOT.height} />
+      <g clipPath="url(#plot-area)">
+        {Array.from({ length: params.count }, (_, i) => (
+          <circle key={i} ref={(el) => void (dots.current[i] = el)} className={i === 0 ? 'fixture-dot first' : 'fixture-dot'} r={i === 0 ? 5 : 4} />
+        ))}
+      </g>
+    </g>
   )
 }
