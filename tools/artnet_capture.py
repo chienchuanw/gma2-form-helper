@@ -25,41 +25,46 @@ channel that lags gets a negative phase, in (-360, 0]. A lead of 90 reads -270.
 """
 
 import argparse
+import bisect
+import cmath
+import functools
 import json
+import math
 import socket
+import struct
 import sys
 import time
+from operator import mul
+from statistics import fmean
 
 ARTNET_PORT = 6454
 HEADER = b"Art-Net\x00"
 OP_DMX = 0x5000
-GRID = 0.005  # seconds between resampled points for analysis
+# Art-Net header, OpCode, protocol version 14, sequence, physical, port-address (little-endian)
+# and the data length (big-endian, its own struct).
+DMX_HEAD = struct.Struct("<8sHBBBBH")
+DMX_LENGTH = struct.Struct(">H")
+GRID = 0.01  # seconds between resampled points for analysis (Art-Net runs at about 30-44 Hz)
 MIN_CYCLES = 6  # fewer cycles than this and the numbers get noticeably rougher
 
 
-def artdmx_packet(universe, data, sequence=0):
+def artdmx_packet(universe, data):
     """Build an ArtDmx packet (used by the tests; handy for trying the tool without a console)."""
     if len(data) % 2:
         data += b"\x00"  # Art-Net wants an even length
-    return (
-        HEADER
-        + OP_DMX.to_bytes(2, "little")
-        + bytes([0, 14, sequence, 0, universe & 0xFF, (universe >> 8) & 0x7F])
-        + len(data).to_bytes(2, "big")
-        + bytes(data)
-    )
+    return DMX_HEAD.pack(HEADER, OP_DMX, 0, 14, 0, 0, universe & 0x7FFF) + DMX_LENGTH.pack(len(data)) + data
 
 
 def parse_artdmx(packet):
     """(port-address universe, DMX data) of an ArtDmx packet, or None for anything else."""
-    if len(packet) < 18 or packet[:8] != HEADER or int.from_bytes(packet[8:10], "little") != OP_DMX:
+    if len(packet) < DMX_HEAD.size + DMX_LENGTH.size:
         return None
-    universe = packet[14] | (packet[15] << 8)
-    length = int.from_bytes(packet[16:18], "big")
-    data = packet[18 : 18 + length]
-    if len(data) < length:
+    header, opcode, *_, universe = DMX_HEAD.unpack_from(packet)
+    if header != HEADER or opcode != OP_DMX:
         return None
-    return universe, bytes(data)
+    (length,) = DMX_LENGTH.unpack_from(packet, DMX_HEAD.size)
+    data = packet[DMX_HEAD.size + DMX_LENGTH.size :][:length]
+    return (universe, data) if len(data) == length else None
 
 
 def parse_channels(text):
@@ -89,27 +94,25 @@ def capture(sock, universe, channels, seconds, clock=time.monotonic):
         if parsed is None or parsed[0] != universe:
             continue
         data = parsed[1]
-        samples.append([round(clock() - start, 4)] + [data[c - 1] if c <= len(data) else 0 for c in channels])
+        samples.append([clock() - start] + [data[c - 1] if c <= len(data) else 0 for c in channels])
     return samples
 
 
-def resample(samples, column):
-    """Values of one column on an even GRID, linearly interpolated between packets."""
-    times = [s[0] for s in samples]
-    out, k = [], 0
-    t = times[0]
-    while t <= times[-1]:
-        while k + 1 < len(times) - 1 and times[k + 1] <= t:
-            k += 1
+def resample(times, values):
+    """values on an even GRID from times[0] to times[-1], linearly interpolated between packets."""
+    out = []
+    steps = int((times[-1] - times[0]) / GRID)
+    for j in range(steps + 1):
+        t = times[0] + j * GRID
+        k = min(bisect.bisect_right(times, t) - 1, len(times) - 2)
         t0, t1 = times[k], times[k + 1]
-        v0, v1 = samples[k][column], samples[k + 1][column]
-        out.append(v0 if t1 == t0 else v0 + (v1 - v0) * (t - t0) / (t1 - t0))
-        t += GRID
+        v0, v1 = values[k], values[k + 1]
+        out.append(v0 if t1 == t0 else v0 + (v1 - v0) * (t - t0) / (t1 - t0))  # packets read in one burst share a time
     return out
 
 
 def centred(values):
-    mean = sum(values) / len(values)
+    mean = fmean(values)
     return [v - mean for v in values]
 
 
@@ -123,16 +126,13 @@ def peak(f, i):
 def find_period(x):
     """Cycle length of x in grid steps: the first autocorrelation peak after it dips below zero."""
     n = len(x)
-    energy = sum(v * v for v in x) / n
+    energy = fmean(v * v for v in x)
     if energy < 1e-6:
         raise ValueError("the first channel does not change; is the effect running?")
 
-    cache = {}
-
+    @functools.cache
     def r(lag):
-        if lag not in cache:
-            cache[lag] = sum(x[i] * x[i + lag] for i in range(n - lag)) / (n - lag) / energy
-        return cache[lag]
+        return sum(map(mul, x[: n - lag], x[lag:])) / (n - lag) / energy
 
     dipped = False
     for lag in range(1, n // 2):
@@ -143,39 +143,37 @@ def find_period(x):
     raise ValueError("no repeating cycle found; capture at least two cycles")
 
 
-def phase_of(x, y, period):
-    """How far y runs behind x, as a fraction of the cycle in [0, 1)."""
-    n = len(x)
-    steps = round(period)
-
-    def c(lag):
-        if lag < 0:
-            return sum(x[i - lag] * y[i] for i in range(n + lag)) / (n + lag)
-        return sum(x[i] * y[i + lag] for i in range(n - lag)) / (n - lag)
-
-    best = max(range(steps), key=c)
-    return (peak(c, best) / period) % 1
+def fundamental(x, period):
+    """The cycle-rate Fourier component of x over a whole number of cycles."""
+    length = round(int(len(x) / period) * period)
+    w = -2j * math.pi / period
+    return sum(v * cmath.exp(w * i) for i, v in enumerate(x[:length]))
 
 
 def analyze(samples):
-    """Cycle length (s) and, per channel, phase relative to the first channel and its range."""
-    columns = len(samples[0]) - 1
-    series = [resample(samples, k + 1) for k in range(columns)]
-    first = centred(series[0])
-    period = find_period(first)
+    """Cycle length (s) and, per channel, phase relative to the first channel and its range.
+
+    Every channel of a phase-spread effect is the same waveform shifted in time,
+    so the shift is the angle between the channels' cycle-rate components.
+    """
+    times = [s[0] for s in samples]
+    columns = [[s[k] for s in samples] for k in range(1, len(samples[0]))]
+    series = [centred(resample(times, values)) for values in columns]
+    period = find_period(series[0])
+    cycle = period * GRID
+    reference = fundamental(series[0], period)
     channels = []
-    for values in series:
-        lag = phase_of(first, centred(values), period)
-        phase = (-360 * lag) % 360
-        if phase > 0.5:
-            phase -= 360  # (-359.5, 0.5]: a tiny lead of the first channel reads 0, not -360
+    for values, raw in zip(series, columns):
+        z = fundamental(values, period)
+        lag = (cmath.phase(reference) - cmath.phase(z)) / (2 * math.pi)  # cycles behind the first channel
+        follows = abs(z) > 1e-3 * abs(reference)  # a channel outside the effect has no phase
         channels.append({
-            "phase_deg": round(phase, 1) + 0.0,  # never -0.0
-            "min_percent": round(min(values) / 2.55, 1),
-            "max_percent": round(max(values) / 2.55, 1),
+            # MA's convention: a lag is negative, in (-360, 0]. The second % 360 turns a rounded 360.0 into 0.
+            "phase_deg": 0.0 - round(360 * lag % 360, 1) % 360 if follows else None,
+            "min_percent": round(min(raw) / 2.55, 1),
+            "max_percent": round(max(raw) / 2.55, 1),
         })
-    span = samples[-1][0] - samples[0][0]
-    return {"cycle_seconds": period * GRID, "cycles": span / (period * GRID), "channels": channels}
+    return {"cycle_seconds": cycle, "cycles": (times[-1] - times[0]) / cycle, "channels": channels}
 
 
 def main(argv, out=print):
@@ -215,7 +213,8 @@ def main(argv, out=print):
     if result["cycles"] < MIN_CYCLES:
         out(f"warning: fewer than {MIN_CYCLES} cycles captured; capture longer for accurate numbers")
     for channel, info in zip(data["channels"], result["channels"]):
-        out(f"ch {channel:>2}  phase {info['phase_deg']:7.1f}°  range {info['min_percent']:.1f}-{info['max_percent']:.1f} %")
+        phase = "no cycle" if info["phase_deg"] is None else f"{info['phase_deg']:7.1f}°"
+        out(f"ch {channel:>2}  phase {phase:>8}  range {info['min_percent']:.1f}-{info['max_percent']:.1f} %")
     return 0
 
 
