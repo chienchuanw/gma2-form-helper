@@ -1,12 +1,11 @@
 import json
-import math
 import random
 import socket
 import tempfile
 import unittest
 from pathlib import Path
 
-from artnet_capture import analyze, artdmx_packet, capture, main, parse_artdmx, parse_channels
+from artnet_capture import HEADER, analyze, artdmx_packet, capture, main, parse_artdmx, parse_channels
 
 
 def triangle(u):
@@ -42,10 +41,10 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(parse_artdmx(artdmx_packet(universe=0, data=bytes([1, 2, 3]))), (0, bytes([1, 2, 3, 0])))
 
     def test_ignores_other_packets(self):
-        poll = b"Art-Net\x00" + (0x2000).to_bytes(2, "little") + bytes([0, 14, 0, 0])
+        poll = HEADER + (0x2000).to_bytes(2, "little") + bytes([0, 14, 0, 0])
         self.assertIsNone(parse_artdmx(poll))
         self.assertIsNone(parse_artdmx(b"hello"))
-        self.assertIsNone(parse_artdmx(b"Art-Net\x00\x00\x50"))  # cut short
+        self.assertIsNone(parse_artdmx(HEADER + b"\x00\x50"))  # cut short
 
     def test_ignores_data_shorter_than_its_length_field(self):
         packet = artdmx_packet(universe=0, data=bytes(4))[:-2]
@@ -79,6 +78,7 @@ class AnalyzeTests(unittest.TestCase):
         phases = [c["phase_deg"] for c in result["channels"]]
         for got, want in zip(phases, [-45 * i for i in range(8)]):
             self.assertAlmostEqual(got, want, delta=2)
+            self.assertEqual(got, round(got, 1))  # one decimal, no float noise
 
     def test_reports_a_lead_as_the_same_lag(self):
         # Phase repeats every cycle: a quarter cycle ahead is three quarters behind.
@@ -98,71 +98,78 @@ class AnalyzeTests(unittest.TestCase):
         self.assertAlmostEqual(result["channels"][0]["min_percent"], 20, delta=0.5)
         self.assertAlmostEqual(result["channels"][0]["max_percent"], 80, delta=0.5)
 
+    def test_reports_no_phase_for_a_channel_outside_the_effect(self):
+        samples = [row + [128] for row in synthetic(lopsided, period=2.0, lags=[0])]
+
+        self.assertIsNone(analyze(samples)["channels"][1]["phase_deg"])
+
     def test_refuses_a_capture_without_a_repeating_cycle(self):
         flat = [[t / 40, 128] for t in range(400)]
         with self.assertRaises(ValueError):
             analyze(flat)
 
 
+def send_and_capture(packets, channels, seconds=0.2):
+    """Send packets to a fresh listener on localhost, then capture them."""
+    listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        listener.bind(("127.0.0.1", 0))
+        for packet in packets:
+            sender.sendto(packet, listener.getsockname())
+        return capture(listener, universe=0, channels=channels, seconds=seconds)
+    finally:
+        listener.close()
+        sender.close()
+
+
+def run_analyze(samples, channels):
+    """Output lines of `analyze` on a capture file holding samples."""
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "capture.json"
+        path.write_text(json.dumps({"universe": 0, "channels": channels, "samples": samples}))
+        out = []
+        main(["analyze", str(path)], out=out.append)
+    return "\n".join(out)
+
+
 class CaptureTests(unittest.TestCase):
     def test_records_packets_sent_to_the_socket(self):
-        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        listener.bind(("127.0.0.1", 0))
-        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            address = listener.getsockname()
-            sender.sendto(artdmx_packet(universe=1, data=bytes([9] * 8)), address)  # another universe
-            for level in (10, 20, 30):
-                sender.sendto(artdmx_packet(universe=0, data=bytes([level, level + 1, 0, 0])), address)
-            sender.sendto(b"not art-net", address)
-
-            samples = capture(listener, universe=0, channels=[1, 2], seconds=0.3)
-        finally:
-            listener.close()
-            sender.close()
+        samples = send_and_capture(
+            [artdmx_packet(universe=1, data=bytes([9] * 8))]  # another universe
+            + [artdmx_packet(universe=0, data=bytes([level, level + 1, 0, 0])) for level in (10, 20, 30)]
+            + [b"not art-net"],
+            channels=[1, 2],
+        )
 
         self.assertEqual([s[1:] for s in samples], [[10, 11], [20, 21], [30, 31]])
         times = [s[0] for s in samples]
         self.assertEqual(times, sorted(times))
 
     def test_reads_missing_channels_as_zero(self):
-        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        listener.bind(("127.0.0.1", 0))
-        sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            sender.sendto(artdmx_packet(universe=0, data=bytes([7, 8])), listener.getsockname())
-            samples = capture(listener, universe=0, channels=[1, 5], seconds=0.2)
-        finally:
-            listener.close()
-            sender.close()
+        samples = send_and_capture([artdmx_packet(universe=0, data=bytes([7, 8]))], channels=[1, 5])
 
         self.assertEqual(samples[0][1:], [7, 0])
 
 
 class CliTests(unittest.TestCase):
     def test_analyze_prints_cycle_and_phases_from_a_capture_file(self):
-        samples = synthetic(lopsided, period=2.0, lags=[0, 0.125], seconds=16)
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "capture.json"
-            path.write_text(json.dumps({"universe": 0, "channels": [1, 2], "samples": samples}))
-            out = []
-            main(["analyze", str(path)], out=out.append)
+        text = run_analyze(synthetic(lopsided, period=2.0, lags=[0, 0.125], seconds=16), channels=[1, 2])
 
-        text = "\n".join(out)
         self.assertIn("cycle", text)
         self.assertRegex(text, r"ch\s*2 .*-4[4-6]\.\d")
         self.assertNotIn("-0.0", text)
         self.assertNotIn("warning", text)
 
     def test_analyze_warns_when_the_capture_holds_few_cycles(self):
-        samples = synthetic(lopsided, period=2.0, lags=[0], seconds=5)
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "capture.json"
-            path.write_text(json.dumps({"universe": 0, "channels": [1], "samples": samples}))
-            out = []
-            main(["analyze", str(path)], out=out.append)
+        text = run_analyze(synthetic(lopsided, period=2.0, lags=[0], seconds=5), channels=[1])
 
-        self.assertIn("warning", "\n".join(out))
+        self.assertIn("warning", text)
+
+    def test_analyze_marks_a_channel_outside_the_effect(self):
+        samples = [row + [128] for row in synthetic(lopsided, period=2.0, lags=[0], seconds=16)]
+
+        self.assertRegex(run_analyze(samples, channels=[1, 9]), r"ch\s*9 .*no cycle")
 
 
 if __name__ == "__main__":
