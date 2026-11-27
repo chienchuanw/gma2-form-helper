@@ -5,7 +5,7 @@ import { fitStroke, precisionToTolerance, strokeSpan, type FitMode, type Sample 
 import type { Form, Point } from './core/model'
 import { MODE_LABELS, tableText } from './core/table'
 import { DEFAULT_VERSION, exportFileName, parseFormsXml, serializeFormsXml } from './core/xml'
-import { EffectPreview } from './editor/EffectPreview'
+import { EffectPreview, PreviewMarks } from './editor/EffectPreview'
 import { FormPicker } from './editor/FormPicker'
 import { GraphCanvas, type SnapGrid, type Tool } from './editor/GraphCanvas'
 import { GraphTabs } from './editor/GraphTabs'
@@ -250,8 +250,9 @@ export default function App() {
             tool={tool}
             dispatch={dispatch}
             onStroke={onStroke}
-            preview={{ playback, params: preview }}
-          />
+          >
+            <PreviewMarks graph={graph} params={preview} playback={playback} />
+          </GraphCanvas>
           <p className="muted hint">{tool === 'draw' ? t.drawHint : t.canvasHint}</p>
           <GraphTabs form={form} active={active} dispatch={dispatch} />
           <div role="status" className="notices">

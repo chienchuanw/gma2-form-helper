@@ -13,6 +13,8 @@
   --warn: #f0b429;
   --error: #ff6b6b;
   --focus: #6cb6ff;
+  /* A warm-white lamp, as r g b for rgb(var(--lamp-rgb) / alpha). */
+  --lamp-rgb: 255 214 170;
   color-scheme: dark;
   font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', 'Noto Sans TC', sans-serif;
   color: var(--text);
@@ -150,15 +152,15 @@ input[type='color'] {
   outline-offset: 2px;
 }
 
-label.inline {
+.inline {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   color: var(--muted);
 }
 
-label.inline input,
-label.inline select {
+.inline input,
+.inline select {
   color: var(--text);
 }
 
@@ -503,16 +505,12 @@ dialog.picker li button {
 }
 
 .preview span.inline {
-  display: inline-flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 6px;
-  color: var(--muted);
 }
 
 /* A stage is dark, so the strip stays dark in the light theme too. */
 .fixtures {
-  --lamp-rgb: 255 214 170;
   display: flex;
   gap: 6px;
   padding: 14px 10px 8px;
@@ -535,12 +533,22 @@ dialog.picker li button {
 
 /* Linear in sRGB: the lamp shows the level MA sends, not a fixture's dimmer curve. */
 .lamp {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
   border-radius: 50%;
   border: 1px solid #3a3f46;
   background: rgb(calc(255 * var(--level)) calc(214 * var(--level)) calc(170 * var(--level)));
-  box-shadow: 0 0 calc(18px * var(--level)) calc(2px * var(--level)) rgb(var(--lamp-rgb) / calc(0.7 * var(--level)));
+}
+
+/* The glow is drawn once and faded with opacity, which is cheap to animate every frame. */
+.lamp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 18px 2px rgb(var(--lamp-rgb) / 0.7);
+  opacity: var(--level);
 }
 
 /* Centred with auto margins: justify-content: center would cut off the start of an overflowing row. */
@@ -563,14 +571,14 @@ dialog.picker li button {
 }
 
 .playhead {
-  stroke: #ffd6aa;
+  stroke: rgb(var(--lamp-rgb));
   stroke-width: 1.5;
   opacity: 0.6;
 }
 
 .fixture-dot {
-  fill: #ffd6aa;
-  stroke: #0b0c0e;
+  fill: rgb(var(--lamp-rgb));
+  stroke: var(--plot-bg);
   stroke-width: 1.5;
   opacity: 0.85;
 }
