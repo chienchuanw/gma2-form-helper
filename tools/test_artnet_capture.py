@@ -232,7 +232,14 @@ class CliTests(unittest.TestCase):
         self.assertIn("warning", text)
 
     def test_analyze_reports_errors_without_a_traceback(self):
-        self.assertIn("error:", run_analyze([], channels=[1]))
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "capture.json"
+            path.write_text(json.dumps({"universe": 0, "channels": [1], "samples": []}))
+            out = []
+            code = main(["analyze", str(path)], out=out.append)
+
+        self.assertEqual(code, 1)
+        self.assertTrue(out[0].startswith("error:"))
 
     def test_analyze_marks_a_channel_outside_the_effect(self):
         samples = [row + [128] for row in synthetic(lopsided, period=2.0, lags=[0], seconds=16)]
