@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # runnable from the repo root too
 
-from artnet_capture import HEADER, analyze, artdmx_packet, capture, main, parse_artdmx, parse_channels
+from artnet_capture import HEADER, analyze, artdmx_packet, capture, ma_phase, main, parse_artdmx, parse_channels
 
 
 def triangle(u):
@@ -50,6 +50,20 @@ class ParseTests(unittest.TestCase):
         self.assertIsNone(parse_artdmx(poll))
         self.assertIsNone(parse_artdmx(b"hello"))
         self.assertIsNone(parse_artdmx(HEADER + b"\x00\x50"))  # cut short
+
+    def test_ignores_full_length_packets_that_are_not_artdmx(self):
+        dmx = artdmx_packet(universe=0, data=bytes(8))
+        poll_reply = HEADER + (0x2100).to_bytes(2, "little") + bytes(229)  # MA answers polls with 239-byte ArtPollReply
+        wrong_id = b"Art-Nyt\x00" + dmx[8:]
+        self.assertIsNotNone(parse_artdmx(dmx))
+        self.assertIsNone(parse_artdmx(poll_reply))
+        self.assertIsNone(parse_artdmx(wrong_id))
+
+    def test_ignores_the_unused_top_bit_of_the_port_address(self):
+        packet = bytearray(artdmx_packet(universe=0x123, data=bytes(2)))
+        packet[15] |= 0x80  # Net is 7 bits
+
+        self.assertEqual(parse_artdmx(bytes(packet))[0], 0x123)
 
     def test_ignores_data_shorter_than_its_length_field(self):
         packet = artdmx_packet(universe=0, data=bytes(4))[:-2]
@@ -109,9 +123,29 @@ class AnalyzeTests(unittest.TestCase):
         self.assertIsNone(analyze(samples)["channels"][1]["phase_deg"])
 
     def test_refuses_a_capture_without_a_repeating_cycle(self):
-        flat = [[t / 40, 128] for t in range(400)]
-        with self.assertRaises(ValueError):
-            analyze(flat)
+        ramp = [[t / 40, t * 255 // 400] for t in range(400)]
+        with self.assertRaisesRegex(ValueError, "no repeating cycle"):
+            analyze(ramp)
+
+    def test_refuses_a_flat_first_channel(self):
+        with self.assertRaisesRegex(ValueError, "does not change"):
+            analyze([[t / 40, 128] for t in range(400)])
+
+    def test_refuses_a_capture_with_too_few_packets(self):
+        for samples in ([], [[0.0, 5]]):
+            with self.assertRaisesRegex(ValueError, "packets"):
+                analyze(samples)
+
+
+class MaPhaseTests(unittest.TestCase):
+    def test_turns_a_lag_in_cycles_into_ma_degrees(self):
+        self.assertEqual(ma_phase(0.125), -45.0)
+        self.assertEqual(ma_phase(0.5), -180.0)
+        self.assertEqual(ma_phase(-0.25), -270.0)  # a lead is the same as the matching lag
+
+    def test_reads_zero_not_minus_360_or_minus_zero(self):
+        for lag in (0, 1, 0.99995, -0.00001):
+            self.assertEqual(str(ma_phase(lag)), "0.0")
 
 
 def send_and_capture(packets, channels, seconds=0.2):
@@ -196,6 +230,9 @@ class CliTests(unittest.TestCase):
         text = run_analyze(synthetic(lopsided, period=2.0, lags=[0], seconds=5), channels=[1])
 
         self.assertIn("warning", text)
+
+    def test_analyze_reports_errors_without_a_traceback(self):
+        self.assertIn("error:", run_analyze([], channels=[1]))
 
     def test_analyze_marks_a_channel_outside_the_effect(self):
         samples = [row + [128] for row in synthetic(lopsided, period=2.0, lags=[0], seconds=16)]

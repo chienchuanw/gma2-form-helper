@@ -8,8 +8,9 @@ how long one cycle lasts at a given Effect Speed.
 Setup on the onPC machine, in the lab show (form-helper-lab) only:
   1. Patch 8 dimmers on universe 1, channels 1-8.
   2. Setup > Network > Network Protocols: enable Art-Net output for universe 1
-     (by default MA universe 1 goes out as Art-Net universe 0) to this computer
-     or to broadcast on the shared network.
+     (by default MA universe 1 goes out as Art-Net universe 0), as broadcast on
+     the shared network or unicast to this computer. With unicast, close other
+     Art-Net software here: only the first program listening gets the packets.
   3. Run the effect, e.g. a Form as a dimmer effect, Phase 0 Thru -360.
 
 Usage:
@@ -64,7 +65,7 @@ def parse_artdmx(packet):
         return None
     (length,) = DMX_LENGTH.unpack_from(packet, DMX_HEAD.size)
     data = packet[DMX_HEAD.size + DMX_LENGTH.size :][:length]
-    return (universe, data) if len(data) == length else None
+    return (universe & 0x7FFF, data) if len(data) == length else None  # Net is 7 bits
 
 
 def parse_channels(text):
@@ -150,12 +151,23 @@ def fundamental(x, period):
     return sum(v * cmath.exp(w * i) for i, v in enumerate(x[:length]))
 
 
+def ma_phase(lag):
+    """A lag in cycles as MA's phase: negative, in (-360, 0], one decimal.
+
+    Phase repeats every cycle, so a lead reads as the matching lag. The second
+    % 360 turns a lag that rounds to a whole cycle into 0, not -360.
+    """
+    return 0.0 - round(360 * lag % 360, 1) % 360
+
+
 def analyze(samples):
     """Cycle length (s) and, per channel, phase relative to the first channel and its range.
 
     Every channel of a phase-spread effect is the same waveform shifted in time,
     so the shift is the angle between the channels' cycle-rate components.
     """
+    if len(samples) < 2:
+        raise ValueError(f"{len(samples)} packets captured; is Art-Net reaching this computer?")
     times = [s[0] for s in samples]
     columns = [[s[k] for s in samples] for k in range(1, len(samples[0]))]
     series = [centred(resample(times, values)) for values in columns]
@@ -168,8 +180,7 @@ def analyze(samples):
         lag = (cmath.phase(reference) - cmath.phase(z)) / (2 * math.pi)  # cycles behind the first channel
         follows = abs(z) > 1e-3 * abs(reference)  # a channel outside the effect has no phase
         channels.append({
-            # MA's convention: a lag is negative, in (-360, 0]. The second % 360 turns a rounded 360.0 into 0.
-            "phase_deg": 0.0 - round(360 * lag % 360, 1) % 360 if follows else None,
+            "phase_deg": ma_phase(lag) if follows else None,
             "min_percent": round(min(raw) / 2.55, 1),
             "max_percent": round(max(raw) / 2.55, 1),
         })
@@ -194,7 +205,7 @@ def main(argv, out=print):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if hasattr(socket, "SO_REUSEPORT"):
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)  # share the port with other Art-Net apps
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)  # lets other Art-Net apps hear broadcast too
         sock.bind((args.bind, args.port))
         try:
             samples = capture(sock, args.universe, args.channels, args.seconds)
@@ -207,7 +218,11 @@ def main(argv, out=print):
 
     with open(args.file) as f:
         data = json.load(f)
-    result = analyze(data["samples"])
+    try:
+        result = analyze(data["samples"])
+    except ValueError as e:
+        out(f"error: {e}")
+        return 1
     cycle = result["cycle_seconds"]
     out(f"cycle {cycle:.3f} s ({60 / cycle:.2f} cycles per minute), {result['cycles']:.1f} cycles captured")
     if result["cycles"] < MIN_CYCLES:
