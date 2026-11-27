@@ -13,6 +13,8 @@ import { initialState, isLatestStroke, reducer } from './editor/state'
 import { LangContext, STRINGS, detectLang, type Lang } from './i18n'
 
 /** Versions whose import has been verified on a console or onPC. */
+// Absolute on purpose: on the origin hostname a relative "/" would not reach the hub.
+const HUB_URL = 'https://gma2.chienchuanw.com/'
 const VERSIONS = [DEFAULT_VERSION]
 const SNAP: SnapGrid = { x: 0.125, y: 0.1 }
 
@@ -146,13 +148,18 @@ export default function App() {
           <h1>{t.appTitle}</h1>
           <p className="muted">{t.tagline}</p>
         </div>
-        <label className="inline">
-          {t.language}
-          <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
-            <option value="en">English</option>
-            <option value="zh-TW">繁體中文</option>
-          </select>
-        </label>
+        <div className="header-actions">
+          <a className="hub-link" href={HUB_URL}>
+            {t.hubLink}
+          </a>
+          <label className="inline">
+            {t.language}
+            <select value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+              <option value="en">English</option>
+              <option value="zh-TW">繁體中文</option>
+            </select>
+          </label>
+        </div>
       </header>
 
       <div className="toolbar">

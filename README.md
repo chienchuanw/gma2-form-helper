@@ -10,7 +10,8 @@ see below).
 > 每個點要填的 X、Y、Mode，或匯出 MA 可直接匯入的 XML。預覽依照在 grandMA2
 > 實測校正的曲線規則繪製，看到的就是 MA 會畫出的樣子。介面支援繁體中文。
 
-**Web app:** https://gma2-form-helper.vercel.app
+**Web app:** https://gma2.chienchuanw.com/form/, part of the [gma2 tools](https://gma2.chienchuanw.com/) site.
+The old address, https://gma2-form-helper.vercel.app, redirects there.
 
 ## Features
 
@@ -85,7 +86,7 @@ Web app:
 ```sh
 cd web
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5173/form/
 npm test           # unit tests
 npm run typecheck && npm run lint && npm run build
 ```
