@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
@@ -120,7 +120,7 @@ describe('Effect preview', () => {
     await user.type(x2, '25{Enter}')
     expect(levels()).toEqual([0, 17, 33, 50, 67, 83, 100, 50]) // 0 to -360: fixture i reads X = 1 - i/8
 
-    await user.click(panel().getByRole('button', { name: 'Phase 0 to 360' }))
+    await user.click(panel().getByRole('button', { name: 'Phase 0 → 360' }))
 
     expect(panel().getByLabelText('Phase to')).toHaveValue(360)
     expect(levels()).toEqual([0, 50, 100, 83, 67, 50, 33, 17]) // fixture i reads X = i/8
@@ -160,10 +160,40 @@ describe('Effect preview', () => {
 
     await user.keyboard(' ')
     expect(panel().getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+    await user.keyboard(' ')
+    expect(panel().getByRole('button', { name: 'Play' })).toBeInTheDocument()
 
     await user.click(panel().getByLabelText('Low'))
     await user.keyboard(' ')
+    expect(panel().getByRole('button', { name: 'Play' })).toBeInTheDocument()
+  })
+
+  it('ignores Space repeating while it is held down', () => {
+    render(<App />)
+
+    fireEvent.keyDown(document.body, { key: ' ' })
+    fireEvent.keyDown(document.body, { key: ' ', repeat: true }) // would toggle back to paused
+
     expect(panel().getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+  })
+
+  it('keeps focus in a field after Enter, so Space types instead of playing', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await setField(user, 'Tempo (BPM)', '90')
+
+    expect(panel().getByLabelText('Tempo (BPM)')).toHaveFocus()
+    expect(panel().getByLabelText('Tempo (BPM)')).toHaveValue(90)
+  })
+
+  it('names each phase preset after what it shows', () => {
+    render(<App />)
+
+    for (const name of ['Phase 0 → −360', 'Phase 0 → 360', 'Phase 0']) {
+      const button = panel().getByRole('button', { name })
+      expect(name).toContain(button.textContent)
+    }
   })
 
   it('toggles once when Space presses the focused play button', async () => {
@@ -185,10 +215,13 @@ describe('Effect preview', () => {
     frame(500) // a quarter bar at 120 BPM
     expect(levels()[0]).toBe(50)
 
-    await user.click(within(screen.getByRole('table', { name: 'Points' })).getAllByRole('button', { name: 'Delete point' })[1])
-    frame(600)
+    // Lower the peak to Y 50 while playing; the clock keeps going.
+    const y2 = within(screen.getByRole('table', { name: 'Points' })).getByLabelText('Y 2')
+    await user.clear(y2)
+    await user.type(y2, '50{Enter}')
+    frame(750) // 3/8 of the bar: half of 75 on the lowered graph (25 if the clock had stopped)
     expect(panel().getByRole('button', { name: 'Pause' })).toBeInTheDocument()
-    expect(levels()[0]).toBe(0) // one point left: a flat graph at Y 0
+    expect(levels()[0]).toBe(38)
 
     await user.click(screen.getByRole('button', { name: 'Undo' }))
     await user.click(panel().getByRole('button', { name: 'Back to start' }))

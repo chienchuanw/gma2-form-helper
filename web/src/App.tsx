@@ -60,7 +60,7 @@ export default function App() {
         // A focused button already reacts to Space itself.
         if ((e.target as HTMLElement).closest('button, a, summary')) return
         e.preventDefault()
-        togglePlay()
+        if (!e.repeat) togglePlay() // holding Space does not flicker
       } else if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         dispatch({ type: e.shiftKey ? 'redo' : 'undo' })
