@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cycleSeconds } from '../core/effect'
 
 export type FrameListener = (pos: number) => void
@@ -63,4 +63,19 @@ export function usePlayback(bpm: number): Playback {
   }, [])
 
   return { playing, toggle, reset, position, subscribe }
+}
+
+/**
+ * Run draw(pos) on every frame and after every render, so what it draws
+ * follows both playback and edits made while paused. draw writes to the DOM
+ * directly; it always sees the latest props.
+ */
+export function useFrame(playback: Playback, draw: FrameListener): void {
+  const latest = useRef(draw)
+  const { position, subscribe } = playback
+  useLayoutEffect(() => {
+    latest.current = draw
+    draw(position())
+  })
+  useEffect(() => subscribe((pos) => latest.current(pos)), [subscribe])
 }
