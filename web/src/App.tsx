@@ -1,15 +1,18 @@
 import { useEffect, useReducer, useRef, useState, type ChangeEvent } from 'react'
+import { DEFAULT_PREVIEW } from './core/effect'
 import { analyzeGraph } from './core/evaluate'
 import { fitStroke, precisionToTolerance, strokeSpan, type FitMode, type Sample } from './core/fit'
 import type { Form, Point } from './core/model'
 import { MODE_LABELS, tableText } from './core/table'
 import { DEFAULT_VERSION, exportFileName, parseFormsXml, serializeFormsXml } from './core/xml'
+import { EffectPreview } from './editor/EffectPreview'
 import { FormPicker } from './editor/FormPicker'
 import { GraphCanvas, type SnapGrid, type Tool } from './editor/GraphCanvas'
 import { GraphTabs } from './editor/GraphTabs'
 import { ModeSelect } from './editor/ModeSelect'
 import { PointTable } from './editor/PointTable'
 import { initialState, isLatestStroke, reducer } from './editor/state'
+import { usePlayback } from './editor/usePlayback'
 import { LangContext, STRINGS, detectLang, type Lang } from './i18n'
 
 /** Versions whose import has been verified on a console or onPC. */
@@ -29,6 +32,9 @@ export default function App() {
   const [choices, setChoices] = useState<Form[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<'idle' | 'ok' | 'failed'>('idle')
+  const [preview, setPreview] = useState(DEFAULT_PREVIEW)
+  const playback = usePlayback(preview.bpm)
+  const { toggle: togglePlay } = playback
   const t = STRINGS[lang]
 
   const { form, active, selected } = history.present
@@ -50,7 +56,12 @@ export default function App() {
       if (document.querySelector('dialog[open]')) return
       const mod = e.metaKey || e.ctrlKey
       const sel = selectedRef.current
-      if (mod && e.key.toLowerCase() === 'z') {
+      if (e.key === ' ' && !mod) {
+        // A focused button already reacts to Space itself.
+        if ((e.target as HTMLElement).closest('button, a, summary')) return
+        e.preventDefault()
+        togglePlay()
+      } else if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         dispatch({ type: e.shiftKey ? 'redo' : 'undo' })
       } else if (mod && e.key.toLowerCase() === 'y') {
@@ -69,7 +80,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [togglePlay])
 
   const fitInto = (id: number, samples: Sample[], context: readonly Point[], p: number, mode: FitMode) => {
     const span = strokeSpan(samples)
@@ -239,6 +250,7 @@ export default function App() {
             tool={tool}
             dispatch={dispatch}
             onStroke={onStroke}
+            preview={{ playback, params: preview }}
           />
           <p className="muted hint">{tool === 'draw' ? t.drawHint : t.canvasHint}</p>
           <GraphTabs form={form} active={active} dispatch={dispatch} />
@@ -250,6 +262,7 @@ export default function App() {
               </p>
             ))}
           </div>
+          <EffectPreview graph={graph} settings={preview} onChange={setPreview} playback={playback} />
         </section>
 
         <aside className="values">

@@ -19,6 +19,14 @@ export interface EffectParams {
   high: number
 }
 
+export interface PreviewSettings extends EffectParams {
+  /** Music tempo; one cycle of the Form is one bar. */
+  bpm: number
+}
+
+/** 8 fixtures half a beat apart (MA's default Phase 0 Thru −360) at 120 BPM over the full range. */
+export const DEFAULT_PREVIEW: PreviewSettings = { count: 8, bpm: 120, phaseStart: 0, phaseEnd: -360, low: 0, high: 100 }
+
 export interface FixtureState {
   /** Phase in degrees. */
   phase: number

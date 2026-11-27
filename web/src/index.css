@@ -485,3 +485,96 @@ dialog.picker li button {
   width: 100%;
   justify-content: space-between;
 }
+
+/* Effect preview */
+
+.preview {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.preview .toolbar {
+  margin-bottom: 10px;
+}
+
+.num-field {
+  width: 5.5em;
+}
+
+.preview span.inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+/* A stage is dark, so the strip stays dark in the light theme too. */
+.fixtures {
+  --lamp-rgb: 255 214 170;
+  display: flex;
+  gap: 6px;
+  padding: 14px 10px 8px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: var(--plot-bg);
+  overflow-x: auto;
+}
+
+.fixture {
+  --level: 0;
+  flex: 1 1 0;
+  min-width: 14px;
+  max-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Linear in sRGB: the lamp shows the level MA sends, not a fixture's dimmer curve. */
+.lamp {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid #3a3f46;
+  background: rgb(calc(255 * var(--level)) calc(214 * var(--level)) calc(170 * var(--level)));
+  box-shadow: 0 0 calc(18px * var(--level)) calc(2px * var(--level)) rgb(var(--lamp-rgb) / calc(0.7 * var(--level)));
+}
+
+/* Centred with auto margins: justify-content: center would cut off the start of an overflowing row. */
+.fixture:first-child {
+  margin-left: auto;
+}
+
+.fixture:last-child {
+  margin-right: auto;
+}
+
+.fixture-num {
+  font-size: 11px;
+  color: #8b929b;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-marks {
+  pointer-events: none;
+}
+
+.playhead {
+  stroke: #ffd6aa;
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.fixture-dot {
+  fill: #ffd6aa;
+  stroke: #0b0c0e;
+  stroke-width: 1.5;
+  opacity: 0.85;
+}
+
+.fixture-dot.first {
+  fill: #fff;
+}

@@ -1,9 +1,11 @@
 import { useRef, useState, type PointerEvent } from 'react'
+import { fixtureFrame, type EffectParams } from '../core/effect'
 import type { Sample } from '../core/fit'
 import { snap, type Form } from '../core/model'
 import { useStrings } from '../i18n'
 import { PLOT, VIEW_H, VIEW_W, curvePath, fromSvg, nearestPoint, toGraph, toSvg } from './geometry'
 import type { Action } from './state'
+import { useFrame, type Playback } from './usePlayback'
 
 export interface SnapGrid {
   x: number
@@ -21,6 +23,8 @@ interface Props {
   dispatch: (a: Action) => void
   /** A finished freehand stroke in 0–1 coordinates (draw tool). */
   onStroke: (samples: Sample[]) => void
+  /** The effect preview, marked on the curve: a playhead at fixture 1 and a dot per fixture. */
+  preview: { playback: Playback; params: EffectParams }
 }
 
 /** Grab radius in screen pixels, so points stay easy to hit on small screens. */
@@ -29,7 +33,7 @@ const TICKS = Array.from({ length: 11 }, (_, i) => i / 10)
 /** One cycle is one bar of four beats: downbeats on 0/25/50/75, upbeats ("&") halfway between. */
 const BEATS = [0, 1, 2, 3].map((b) => ({ n: b + 1, x: b / 4 }))
 
-export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onStroke }: Props) {
+export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onStroke, preview }: Props) {
   const t = useStrings()
   const svgRef = useRef<SVGSVGElement>(null)
   /** pointerId of the pointer dragging a point or drawing, or null. */
@@ -42,6 +46,22 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
     setStroke(s)
   }
   const graph = form.graphs[active]
+
+  const playhead = useRef<SVGLineElement>(null)
+  const dots = useRef<(SVGCircleElement | null)[]>([])
+  useFrame(preview.playback, (pos) => {
+    const frame = fixtureFrame(graph, pos, preview.params)
+    if (frame.length > 0) {
+      const x = toSvg(frame[0].x, 0)[0].toFixed(1)
+      playhead.current?.setAttribute('x1', x)
+      playhead.current?.setAttribute('x2', x)
+    }
+    frame.forEach((f, i) => {
+      const [cx, cy] = toSvg(f.x, f.value)
+      dots.current[i]?.setAttribute('cx', cx.toFixed(1))
+      dots.current[i]?.setAttribute('cy', cy.toFixed(1))
+    })
+  })
 
   const toView = (e: PointerEvent): [number, number] => {
     const r = svgRef.current!.getBoundingClientRect()
@@ -169,6 +189,14 @@ export function GraphCanvas({ form, active, selected, grid, tool, dispatch, onSt
           i === active ? null : <path key={i} className="curve other" d={curvePath(g)} stroke={`#${g.color}`} />,
         )}
         <path className="curve active" d={curvePath(graph)} stroke={`#${graph.color}`} />
+      </g>
+      <g className="preview-marks" aria-hidden="true">
+        <line ref={playhead} className="playhead" y1={PLOT.top} y2={PLOT.top + PLOT.height} />
+        <g clipPath="url(#plot-area)">
+          {Array.from({ length: preview.params.count }, (_, i) => (
+            <circle key={i} ref={(el) => void (dots.current[i] = el)} className={i === 0 ? 'fixture-dot first' : 'fixture-dot'} r={i === 0 ? 5 : 4} />
+          ))}
+        </g>
       </g>
       {stroke && (
         <polyline
