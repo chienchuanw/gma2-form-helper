@@ -1,4 +1,6 @@
+import { Analytics } from '@vercel/analytics/react'
 import { useEffect, useReducer, useRef, useState, type ChangeEvent } from 'react'
+import { ANALYTICS_PROPS } from './analytics'
 import { DEFAULT_PREVIEW } from './core/effect'
 import { analyzeGraph } from './core/evaluate'
 import { fitStroke, precisionToTolerance, strokeSpan, type FitMode, type Sample } from './core/fit'
@@ -154,6 +156,7 @@ export default function App() {
 
   return (
     <LangContext.Provider value={lang}>
+      <Analytics {...ANALYTICS_PROPS} />
       <header className="app-header">
         <div>
           <h1>{t.appTitle}</h1>
