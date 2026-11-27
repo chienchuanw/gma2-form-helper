@@ -8,7 +8,8 @@ see below).
 
 > 在瀏覽器裡畫出 grandMA2 的 Effect Form，直接得到 Graph Editor Table Mode
 > 每個點要填的 X、Y、Mode，或匯出 MA 可直接匯入的 XML。預覽依照在 grandMA2
-> 實測校正的曲線規則繪製，看到的就是 MA 會畫出的樣子。介面支援繁體中文。
+> 實測校正的曲線規則繪製，看到的就是 MA 會畫出的樣子。也能把 Form 當成
+> Dimmer Effect 套在一排燈上試跑，看相位分布與明暗變化。介面支援繁體中文。
 
 **Web app:** https://gma2-form-helper.vercel.app
 
@@ -27,6 +28,14 @@ see below).
   use that one mode.
 - **Beat guides**: one cycle of the Form is one bar, so the canvas marks beats
   1 to 4 and the upbeats (&) between them to help place hits on the music.
+- **Effect preview**: play the active graph as a dimmer effect on a row of 1 to
+  32 fixtures under the canvas, with Phase spread across them (MA's default
+  0 → −360), Low/High and the song's tempo in BPM, so one cycle plays as one
+  bar. Edit while it plays; Space plays or pauses. The canvas marks where each
+  fixture is on the curve, and the panel shows the Effect Speed to enter in MA
+  (BPM ÷ 4). How MA spreads the phase and counts Speed is not yet measured on
+  a console ([#25](https://github.com/chienchuanw/gma2-form-helper/issues/25)),
+  so MA may time the wave slightly differently.
 - **Several graphs per Form**, one tab each like MA's Table Mode, with names and
   colours; the other graphs show faintly behind the active one.
 - **Table Mode values** formatted exactly as MA shows them (0–100, two decimals),
