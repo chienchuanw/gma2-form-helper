@@ -172,6 +172,22 @@ input[type='color'] {
   margin-bottom: 16px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hub-link {
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.hub-link:hover {
+  color: var(--text);
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

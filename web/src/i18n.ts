@@ -5,6 +5,7 @@ export type Lang = 'en' | 'zh-TW'
 
 const en = {
   appTitle: 'grandMA2 Form Helper',
+  hubLink: 'gma2 tools',
   tagline: 'Draw an effect form and get the exact Graph Editor values.',
   language: 'Language',
   formName: 'Form name',
@@ -74,6 +75,7 @@ type Strings = typeof en
 
 const zh: Strings = {
   appTitle: 'grandMA2 Form Helper',
+  hubLink: 'gma2 工具',
   tagline: '畫出 Effect Form，直接取得 Graph Editor 要填的數值。',
   language: '語言',
   formName: 'Form 名稱',
